@@ -1,0 +1,16 @@
+# Static table lookup for hostnames.
+# See hosts(5) for details.
+#
+
+127.0.0.1   store.steampowered.com
+127.0.0.1   steamcommunity.com
+127.0.0.1   help.steampowered.com
+127.0.0.1   api.steampowered.com
+127.0.0.1   media.steampowered.com
+127.0.0.1   cdn.steampowered.com
+127.0.0.1   client-download.steampowered.com
+127.0.0.1   steampowered.com
+127.0.0.1   steamcdn-a.akamaihd.net
+127.0.0.1   steamgames.com
+127.0.0.1   cdn.akamai.steamstatic.com
+127.0.0.1   cdn.cloudflare.steamstatic.com
