@@ -1,6 +1,5 @@
 # Static table lookup for hostnames.
 # See hosts(5) for details.
-#
 
 127.0.0.1   store.steampowered.com
 127.0.0.1   steamcommunity.com
@@ -14,3 +13,15 @@
 127.0.0.1   steamgames.com
 127.0.0.1   cdn.akamai.steamstatic.com
 127.0.0.1   cdn.cloudflare.steamstatic.com
+127.0.0.1    youtube.com
+127.0.0.1    www.youtube.com
+127.0.0.1    m.youtube.com
+127.0.0.1    youtube-nocookie.com
+127.0.0.1    www.youtube-nocookie.com
+127.0.0.1    s.ytimg.com
+127.0.0.1    i.ytimg.com
+127.0.0.1    ytimg.com
+127.0.0.1    youtu.be
+127.0.0.1    s.youtube.com
+127.0.0.1    googlevideo.com
+127.0.0.1    www.googlevideo.com
