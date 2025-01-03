@@ -25,3 +25,10 @@
 127.0.0.1    s.youtube.com
 127.0.0.1    googlevideo.com
 127.0.0.1    www.googlevideo.com
+0.0.0.0   discord.com
+0.0.0.0   www.discord.com
+0.0.0.0   discordapp.com
+0.0.0.0   www.discordapp.com
+0.0.0.0   cdn.discordapp.com
+0.0.0.0   cdn.discord.com
+0.0.0.0   media.discordapp.net
