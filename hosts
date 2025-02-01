@@ -32,3 +32,12 @@
 0.0.0.0   cdn.discordapp.com
 0.0.0.0   cdn.discord.com
 0.0.0.0   media.discordapp.net
+# Block Minecraft download sites
+127.0.0.1    minecraft.net
+127.0.0.1    www.minecraft.net
+127.0.0.1    mojang.com
+127.0.0.1    www.mojang.com
+127.0.0.1    launcher.mojang.com
+127.0.0.1    libraries.minecraft.net
+127.0.0.1    files.minecraft.net
+# 127.0.0.1    s3.amazonaws.com  # If Minecraft uses Amazon S3 for downloads
