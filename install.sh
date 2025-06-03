@@ -6,8 +6,9 @@ sudo systemctl enable systemd-resolved
 # Remove all attributes from /etc/hosts to allow modifications
 sudo chattr -i -a /etc/hosts 2>/dev/null || true
 
-# Copy the hosts file
-sudo cp hosts /etc/hosts
+# Download the hosts file from StevenBlack's repository
+echo "Downloading hosts file from StevenBlack repository..."
+sudo curl -o /etc/hosts https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts
 
 # Set restrictive permissions (read-only for owner, no access for group/others)
 sudo chmod 600 /etc/hosts
