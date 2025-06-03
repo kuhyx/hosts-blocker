@@ -10,8 +10,8 @@ sudo chattr -i -a /etc/hosts 2>/dev/null || true
 echo "Downloading hosts file from StevenBlack repository..."
 sudo curl -o /etc/hosts https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts
 
-# Set restrictive permissions (read-only for owner, no access for group/others)
-sudo chmod 600 /etc/hosts
+# Set proper permissions (readable by all, writable only by root)
+sudo chmod 644 /etc/hosts
 
 # Make the file immutable (prevents deletion, renaming, and most modifications)
 sudo chattr +i /etc/hosts
@@ -23,3 +23,4 @@ sudo chattr +a /etc/hosts
 
 # Flush DNS caches
 sudo systemd-resolve --flush-caches
+sudo systemctl restart NetworkManager.service
