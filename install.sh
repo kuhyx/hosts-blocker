@@ -10,6 +10,40 @@ sudo chattr -i -a /etc/hosts 2>/dev/null || true
 echo "Downloading hosts file from StevenBlack repository..."
 sudo curl -o /etc/hosts https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts
 
+# Add custom entries for YouTube and Discord
+echo "Adding custom entries for YouTube and Discord..."
+sudo cat >> /etc/hosts << 'EOF'
+
+# Custom blocking entries
+# YouTube
+0.0.0.0 youtube.com
+0.0.0.0 www.youtube.com
+0.0.0.0 m.youtube.com
+0.0.0.0 youtu.be
+0.0.0.0 youtube-nocookie.com
+0.0.0.0 www.youtube-nocookie.com
+0.0.0.0 youtubei.googleapis.com
+0.0.0.0 youtube.googleapis.com
+0.0.0.0 yt3.ggpht.com
+0.0.0.0 ytimg.com
+0.0.0.0 i.ytimg.com
+0.0.0.0 s.ytimg.com
+0.0.0.0 i9.ytimg.com
+0.0.0.0 googlevideo.com
+0.0.0.0 r1---sn-4g5e6nls.googlevideo.com
+0.0.0.0 r1---sn-4g5lne7s.googlevideo.com
+
+# Discord (selective blocking - media only, voice chat allowed)
+0.0.0.0 cdn.discordapp.com
+0.0.0.0 media.discordapp.net
+0.0.0.0 images-ext-1.discordapp.net
+0.0.0.0 images-ext-2.discordapp.net
+0.0.0.0 attachments-1.discordapp.net
+0.0.0.0 attachments-2.discordapp.net
+0.0.0.0 tenor.com
+0.0.0.0 giphy.com
+EOF
+
 # Set proper permissions (readable by all, writable only by root)
 sudo chmod 644 /etc/hosts
 
