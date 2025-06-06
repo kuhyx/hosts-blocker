@@ -10,6 +10,15 @@ sudo chattr -i -a /etc/hosts 2>/dev/null || true
 echo "Downloading hosts file from StevenBlack repository..."
 sudo curl -o /etc/hosts https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts
 
+# Comment out any 4chan blocking entries from the downloaded file
+echo "Allowing 4chan by commenting out any blocking entries..."
+sudo sed -i 's/^0\.0\.0\.0 4chan\.com/#0.0.0.0 4chan.com/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 www\.4chan\.com/#0.0.0.0 www.4chan.com/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 4chan\.org/#0.0.0.0 4chan.org/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 boards\.4chan\.org/#0.0.0.0 boards.4chan.org/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 sys\.4chan\.org/#0.0.0.0 sys.4chan.org/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 www\.4chan\.org/#0.0.0.0 www.4chan.org/' /etc/hosts
+
 # Add custom entries for YouTube and Discord
 echo "Adding custom entries for YouTube and Discord..."
 sudo cat >> /etc/hosts << 'EOF'
