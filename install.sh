@@ -42,6 +42,9 @@ sudo cat >> /etc/hosts << 'EOF'
 0.0.0.0 r1---sn-4g5e6nls.googlevideo.com
 0.0.0.0 r1---sn-4g5lne7s.googlevideo.com
 
+# Steam Store
+0.0.0.0 store.steampowered.com
+
 # Discord (selective blocking - media only, voice chat allowed)
 0.0.0.0 cdn.discordapp.com
 0.0.0.0 media.discordapp.net
