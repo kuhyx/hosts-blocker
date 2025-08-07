@@ -56,6 +56,89 @@ sudo cat >> /etc/hosts << 'EOF'
 0.0.0.0 attachments-2.discordapp.net
 0.0.0.0 tenor.com
 0.0.0.0 giphy.com
+
+# Food Delivery Services
+# Polish services
+0.0.0.0 pyszne.pl
+0.0.0.0 www.pyszne.pl
+0.0.0.0 m.pyszne.pl
+0.0.0.0 glovo.com
+0.0.0.0 www.glovo.com
+0.0.0.0 m.glovo.com
+0.0.0.0 bolt.eu
+0.0.0.0 food.bolt.eu
+0.0.0.0 woltwojta.pl
+0.0.0.0 www.woltwojta.pl
+0.0.0.0 wolt.com
+0.0.0.0 www.wolt.com
+0.0.0.0 m.wolt.com
+
+# International services
+0.0.0.0 ubereats.com
+0.0.0.0 www.ubereats.com
+0.0.0.0 m.ubereats.com
+0.0.0.0 uber.com
+0.0.0.0 www.uber.com
+0.0.0.0 m.uber.com
+0.0.0.0 deliveroo.com
+0.0.0.0 www.deliveroo.com
+0.0.0.0 m.deliveroo.com
+0.0.0.0 deliveroo.co.uk
+0.0.0.0 www.deliveroo.co.uk
+0.0.0.0 foodpanda.com
+0.0.0.0 www.foodpanda.com
+0.0.0.0 m.foodpanda.com
+0.0.0.0 grubhub.com
+0.0.0.0 www.grubhub.com
+0.0.0.0 m.grubhub.com
+0.0.0.0 doordash.com
+0.0.0.0 www.doordash.com
+0.0.0.0 m.doordash.com
+0.0.0.0 justeat.com
+0.0.0.0 www.justeat.com
+0.0.0.0 m.justeat.com
+0.0.0.0 justeat.co.uk
+0.0.0.0 www.justeat.co.uk
+0.0.0.0 postmates.com
+0.0.0.0 www.postmates.com
+0.0.0.0 seamless.com
+0.0.0.0 www.seamless.com
+0.0.0.0 menulog.com.au
+0.0.0.0 www.menulog.com.au
+0.0.0.0 delivery.com
+0.0.0.0 www.delivery.com
+
+# Fast food chain apps and websites
+0.0.0.0 mcdonalds.com
+0.0.0.0 www.mcdonalds.com
+0.0.0.0 m.mcdonalds.com
+0.0.0.0 mcdonalds.pl
+0.0.0.0 www.mcdonalds.pl
+0.0.0.0 kfc.com
+0.0.0.0 www.kfc.com
+0.0.0.0 m.kfc.com
+0.0.0.0 kfc.pl
+0.0.0.0 www.kfc.pl
+0.0.0.0 burgerking.com
+0.0.0.0 www.burgerking.com
+0.0.0.0 m.burgerking.com
+0.0.0.0 burgerking.pl
+0.0.0.0 www.burgerking.pl
+0.0.0.0 pizzahut.com
+0.0.0.0 www.pizzahut.com
+0.0.0.0 m.pizzahut.com
+0.0.0.0 pizzahut.pl
+0.0.0.0 www.pizzahut.pl
+0.0.0.0 dominos.com
+0.0.0.0 www.dominos.com
+0.0.0.0 m.dominos.com
+0.0.0.0 dominos.pl
+0.0.0.0 www.dominos.pl
+0.0.0.0 subway.com
+0.0.0.0 www.subway.com
+0.0.0.0 m.subway.com
+0.0.0.0 subway.pl
+0.0.0.0 www.subway.pl
 EOF
 
 # Set proper permissions (readable by all, writable only by root)
