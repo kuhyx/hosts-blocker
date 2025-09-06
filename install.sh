@@ -5,6 +5,26 @@ if [[ $EUID -ne 0 ]]; then
 	exec sudo -E bash "$0" "$@"
 fi
 
+# Options
+# Default: do NOT flush DNS caches unless explicitly requested
+FLUSH_DNS=0
+
+# Parse CLI flags
+for arg in "$@"; do
+	case "$arg" in
+		--flush-dns)
+			FLUSH_DNS=1
+			;;
+		--no-flush-dns)
+			FLUSH_DNS=0
+			;;
+		-h|--help)
+			echo "Usage: $0 [--flush-dns|--no-flush-dns]"
+			exit 0
+			;;
+	esac
+done
+
 # Enable systemd-resolved
 sudo systemctl enable systemd-resolved
 
@@ -244,6 +264,11 @@ sudo chattr +i /etc/hosts
 sudo chattr -i /etc/hosts
 sudo chattr +a /etc/hosts
 
-# Flush DNS caches
-sudo systemd-resolve --flush-caches
-sudo systemctl restart NetworkManager.service
+# Optionally flush DNS caches
+if [[ "$FLUSH_DNS" -eq 1 ]]; then
+	echo "Flushing DNS caches..."
+	sudo systemd-resolve --flush-caches
+	sudo systemctl restart NetworkManager.service
+else
+	echo "DNS cache flush skipped (use --flush-dns to enable)."
+fi
