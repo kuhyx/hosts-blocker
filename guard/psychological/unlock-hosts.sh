@@ -5,6 +5,7 @@ set -euo pipefail
 TARGET=/etc/hosts
 CANON=/usr/local/share/locked-hosts
 LOG=/var/log/hosts-guard.log
+SYSLOG_TAG=hosts-unlock
 EDITOR_CMD=${EDITOR:-nano}
 DELAY_SECONDS=45
 
@@ -13,7 +14,14 @@ log() { printf '%s - %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG" >
 require_root() { if [[ $EUID -ne 0 ]]; then exec sudo -E bash "$0" "$@"; fi }
 require_root "$@"
 
-log "Requested intentional /etc/hosts modification session."
+echo "Reason for editing /etc/hosts (will be logged):" >&2
+read -r -p "Enter reason: " REASON
+if [[ -z ${REASON// } ]]; then
+    echo "Empty reason not allowed. Aborting." >&2
+    exit 1
+fi
+log "Requested intentional /etc/hosts modification session. Reason: $REASON"
+logger -t "$SYSLOG_TAG" "session_start user=${SUDO_USER:-$USER} reason='$REASON'"
 echo "This action is logged. A cooling-off delay of $DELAY_SECONDS seconds applies." >&2
 
 for s in hosts-bind-mount.service hosts-guard.path; do
@@ -42,9 +50,11 @@ sha_before=$(sha256sum "$TARGET" | awk '{print $1}')
 sha_after=$(sha256sum "$TARGET" | awk '{print $1}')
 
 if [[ "$sha_before" == "$sha_after" ]]; then
-    log "No changes made to $TARGET."
+    log "No changes made to $TARGET. Reason: $REASON"
+    logger -t "$SYSLOG_TAG" "no_change user=${SUDO_USER:-$USER} reason='$REASON'"
 else
-    log "Changes detected. Updating canonical copy and re-enforcing."
+    log "Changes detected. Updating canonical copy and re-enforcing. Reason: $REASON"
+    logger -t "$SYSLOG_TAG" "modified user=${SUDO_USER:-$USER} reason='$REASON'"
     cp "$TARGET" "$CANON"
 fi
 
@@ -55,5 +65,6 @@ fi
 systemctl start hosts-guard.path || true
 systemctl start hosts-bind-mount.service || true
 
-log "Unlock session complete."
+log "Unlock session complete. Reason: $REASON"
+logger -t "$SYSLOG_TAG" "session_end user=${SUDO_USER:-$USER} reason='$REASON'"
 echo "Done." >&2
