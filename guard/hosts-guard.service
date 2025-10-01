@@ -1,0 +1,12 @@
+[Unit]
+Description=Enforce canonical /etc/hosts contents
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/enforce-hosts.sh
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

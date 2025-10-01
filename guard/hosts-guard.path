@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch /etc/hosts and trigger enforcement
+
+[Path]
+PathChanged=/etc/hosts
+Unit=hosts-guard.service
+
+[Install]
+WantedBy=multi-user.target
