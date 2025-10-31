@@ -8,7 +8,7 @@ LOGTAG=hosts-guard-hook
 mount_layers_count() { awk '$5=="/etc/hosts"{c++} END{print c+0}' /proc/self/mountinfo 2>/dev/null || echo 0; }
 collapse_mounts() {
   local i=0
-  if command -v mountpoint >/dev/null 2>&1; then
+  if command -v mountpoint >/devnull 2>&1; then
     while mountpoint -q "$TARGET"; do
       umount -l "$TARGET" >/dev/null 2>&1 || break
       i=$((i+1))
