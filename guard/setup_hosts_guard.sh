@@ -46,10 +46,20 @@ ADD_ALIAS_STUB=1
 msg() { printf '\e[1;32m[+]\e[0m %s\n' "$*"; }
 note() { printf '\e[1;34m[i]\e[0m %s\n' "$*"; }
 warn() { printf '\e[1;33m[!]\e[0m %s\n' "$*"; }
-err()  { printf '\e[1;31m[x]\e[0m %s\n' "$*" >&2; }
-run()  { if [[ $DRY_RUN -eq 1 ]]; then printf 'DRY-RUN: %s\n' "$*"; else eval "$@"; fi }
+err() { printf '\e[1;31m[x]\e[0m %s\n' "$*" >&2; }
+run() {
+  if [[ $DRY_RUN -eq 1 ]]; then
+    printf 'DRY-RUN:'
+    if [ "$#" -gt 0 ]; then
+      printf ' %q' "$@"
+    fi
+    printf '\n'
+  else
+    "$@"
+  fi
+}
 
-require_root() { if [[ $EUID -ne 0 ]]; then exec sudo -E bash "$0" "$@"; fi }
+require_root() { if [[ $EUID -ne 0 ]]; then exec sudo -E bash "$0" "$@"; fi; }
 
 usage() { sed -n '1,/^set -euo pipefail/p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -58,21 +68,71 @@ usage() { sed -n '1,/^set -euo pipefail/p' "$0" | sed 's/^# \{0,1\}//'; }
 ######################################################################
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --force-snapshot) FORCE_SNAPSHOT=1 ; shift ;;
-    --no-snapshot) DO_SNAPSHOT=0 ; shift ;;
-    --skip-bind) ENABLE_BIND=0 ; shift ;;
-    --skip-path-watch) ENABLE_PATH=0 ; shift ;;
-    --delay) DELAY=${2:-} ; [[ -z ${DELAY} ]] && { err '--delay requires value'; exit 2; } ; shift 2 ;;
-    --dry-run) DRY_RUN=1 ; shift ;;
-  --no-shell-hooks) INSTALL_SHELL_HOOKS=0 ; shift ;;
-  --shell-hooks) INSTALL_SHELL_HOOKS=1 ; shift ;;
-    --no-audit) INSTALL_AUDIT_RULE=0 ; shift ;;
-    --audit) INSTALL_AUDIT_RULE=1 ; shift ;;
-    --no-alias-stub) ADD_ALIAS_STUB=0 ; shift ;;
-    --alias-stub) ADD_ALIAS_STUB=1 ; shift ;;
-    --uninstall) UNINSTALL=1 ; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) err "Unknown argument: $1"; usage; exit 2 ;;
+    --force-snapshot)
+      FORCE_SNAPSHOT=1
+      shift
+      ;;
+    --no-snapshot)
+      DO_SNAPSHOT=0
+      shift
+      ;;
+    --skip-bind)
+      ENABLE_BIND=0
+      shift
+      ;;
+    --skip-path-watch)
+      ENABLE_PATH=0
+      shift
+      ;;
+    --delay)
+      DELAY=${2:-}
+      [[ -z ${DELAY} ]] && {
+        err '--delay requires value'
+        exit 2
+      }
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --no-shell-hooks)
+      INSTALL_SHELL_HOOKS=0
+      shift
+      ;;
+    --shell-hooks)
+      INSTALL_SHELL_HOOKS=1
+      shift
+      ;;
+    --no-audit)
+      INSTALL_AUDIT_RULE=0
+      shift
+      ;;
+    --audit)
+      INSTALL_AUDIT_RULE=1
+      shift
+      ;;
+    --no-alias-stub)
+      ADD_ALIAS_STUB=0
+      shift
+      ;;
+    --alias-stub)
+      ADD_ALIAS_STUB=1
+      shift
+      ;;
+    --uninstall)
+      UNINSTALL=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      err "Unknown argument: $1"
+      usage
+      exit 2
+      ;;
   esac
 done
 
@@ -119,7 +179,7 @@ if [[ $UNINSTALL -eq 1 ]]; then
     "$SYSTEMD_DIR/hosts-bind-mount.service" \
     "$ZSH_FILTER_SNIPPET" \
     "$BASH_FILTER_SNIPPET"; do
-      if [[ -e $f ]]; then run rm -f "$f"; fi
+    if [[ -e $f ]]; then run rm -f "$f"; fi
   done
   note "Leaving canonical snapshot at $CANON (remove manually if undesired)."
   if [[ $DRY_RUN -eq 0 ]]; then systemctl daemon-reload; fi
@@ -134,10 +194,13 @@ note "Script directory: $SCRIPT_DIR"
 note "Repository root: $REPO_ROOT"
 
 for req in "$TEMPLATE_ENFORCE" "$TEMPLATE_UNLOCK" "$UNIT_GUARD_SERVICE"; do
-  [[ -f $req ]] || { err "Missing template: $req"; exit 1; }
+  [[ -f $req ]] || {
+    err "Missing template: $req"
+    exit 1
+  }
 done
 
-if [[ ! -f "$HOSTS" ]]; then
+if [[ ! -f $HOSTS ]]; then
   err "$HOSTS does not exist. Run your hosts/install.sh first."
   exit 1
 fi
@@ -146,7 +209,7 @@ fi
 # Snapshot
 ######################################################################
 if [[ $DO_SNAPSHOT -eq 1 ]]; then
-  if [[ -f "$CANON" && $FORCE_SNAPSHOT -eq 0 ]]; then
+  if [[ -f $CANON && $FORCE_SNAPSHOT -eq 0 ]]; then
     note "Canonical snapshot exists (use --force-snapshot to overwrite)"
   else
     msg "Creating canonical snapshot at $CANON"
@@ -182,14 +245,12 @@ fi
 if [[ $INSTALL_SHELL_HOOKS -eq 1 ]]; then
   msg "Installing shell history suppression hooks for unlock command"
   # Pattern matches commands invoking unlock-hosts (with or without sudo) & setup script force snapshot
-  FILTER_PATTERN='(^|;|&&|\|\|)\s*(sudo\s+)?(/usr/local/sbin/)?unlock-hosts(\s|;|$)'
-
   # Zsh: use zshaddhistory function
-  if command -v zsh >/dev/null 2>&1; then
+  if command -v zsh > /dev/null 2>&1; then
     if [[ $DRY_RUN -eq 1 ]]; then
       echo "DRY-RUN: would create $ZSH_FILTER_SNIPPET"
     else
-      cat > "$ZSH_FILTER_SNIPPET" <<'ZEOF'
+      cat > "$ZSH_FILTER_SNIPPET" << 'ZEOF'
 # Added by hosts guard setup – suppress unlock-hosts commands from Zsh history
 autoload -Uz add-zsh-hook 2>/dev/null || true
 _hosts_guard_history_filter() {
@@ -213,11 +274,11 @@ ZEOF
   fi
 
   # Bash: rely on HISTCONTROL and PROMPT_COMMAND filter
-  if command -v bash >/dev/null 2>&1; then
+  if command -v bash > /dev/null 2>&1; then
     if [[ $DRY_RUN -eq 1 ]]; then
       echo "DRY-RUN: would create $BASH_FILTER_SNIPPET"
     else
-      cat > "$BASH_FILTER_SNIPPET" <<'BEOF'
+      cat > "$BASH_FILTER_SNIPPET" << 'BEOF'
 # Added by hosts guard setup – suppress unlock-hosts commands from Bash history
 export HISTCONTROL=ignoredups:erasedups
 _hosts_guard_hist_filter() {
@@ -253,7 +314,7 @@ if [[ $ADD_ALIAS_STUB -eq 1 ]]; then
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "DRY-RUN: would create $PROFILE_STUB"
   else
-    cat > "$PROFILE_STUB" <<'ASTUB'
+    cat > "$PROFILE_STUB" << 'ASTUB'
 # Added by hosts guard setup – discourages casual use of unlock-hosts name
 if command -v unlock-hosts >/dev/null 2>&1; then
   alias unlock-hosts='command_not_found_handle 2>/dev/null || echo "Use: sudo /usr/local/sbin/unlock-hosts (logged & delayed)"'
@@ -267,16 +328,17 @@ fi
 # Audit rule to record executions (requires auditd)
 ######################################################################
 if [[ $INSTALL_AUDIT_RULE -eq 1 ]]; then
-  if command -v auditctl >/dev/null 2>&1; then
-    AUDIT_RULE="-w /usr/local/sbin/unlock-hosts -p x -k hosts_unlock"
-    if auditctl -l 2>/dev/null | grep -Fq "/usr/local/sbin/unlock-hosts"; then
+  if command -v auditctl > /dev/null 2>&1; then
+    audit_rule_str="-w /usr/local/sbin/unlock-hosts -p x -k hosts_unlock"
+    audit_rule_args=(-w /usr/local/sbin/unlock-hosts -p x -k hosts_unlock)
+    if auditctl -l 2> /dev/null | grep -Fq "/usr/local/sbin/unlock-hosts"; then
       note "Audit rule already present"
     else
-      run auditctl $AUDIT_RULE || warn "Failed to add audit rule (runtime)"
+      run auditctl "${audit_rule_args[@]}" || warn "Failed to add audit rule (runtime)"
       if [[ $DRY_RUN -eq 1 ]]; then
         echo "DRY-RUN: would create /etc/audit/rules.d/hosts_unlock.rules"
       else
-        echo "$AUDIT_RULE" > /etc/audit/rules.d/hosts_unlock.rules
+        echo "$audit_rule_str" > /etc/audit/rules.d/hosts_unlock.rules
       fi
     fi
   else
@@ -323,22 +385,22 @@ fi
 ######################################################################
 echo
 msg "Hosts guard setup complete"
-echo "Canonical copy: $CANON" 
-echo "Enforce script: $INSTALL_ENFORCE" 
-echo "Unlock command: sudo $INSTALL_UNLOCK" 
-echo "Delay (seconds): $DELAY" 
-echo "Auto-revert path watch: $([[ $ENABLE_PATH -eq 1 ]] && echo enabled || echo disabled)" 
-echo "Read-only bind mount: $([[ $ENABLE_BIND -eq 1 ]] && echo enabled || echo disabled)" 
+echo "Canonical copy: $CANON"
+echo "Enforce script: $INSTALL_ENFORCE"
+echo "Unlock command: sudo $INSTALL_UNLOCK"
+echo "Delay (seconds): $DELAY"
+echo "Auto-revert path watch: $([[ $ENABLE_PATH -eq 1 ]] && echo enabled || echo disabled)"
+echo "Read-only bind mount: $([[ $ENABLE_BIND -eq 1 ]] && echo enabled || echo disabled)"
 echo "Shell history suppression: $([[ $INSTALL_SHELL_HOOKS -eq 1 ]] && echo enabled || echo disabled)"
 echo "Audit rule: $([[ $INSTALL_AUDIT_RULE -eq 1 ]] && echo enabled || echo disabled)"
 echo "Alias stub: $([[ $ADD_ALIAS_STUB -eq 1 ]] && echo enabled || echo disabled)"
 echo
-echo "Test flow:" 
-echo "  sudo sed -i '1s/.*/# tamper test/' /etc/hosts  # Should revert automatically" 
-echo "  sudo $INSTALL_UNLOCK                        # Intentional edit workflow" 
+echo "Test flow:"
+echo "  sudo sed -i '1s/.*/# tamper test/' /etc/hosts  # Should revert automatically"
+echo "  sudo $INSTALL_UNLOCK                        # Intentional edit workflow"
 echo
-echo "Uninstall:" 
-echo "  sudo $0 --uninstall" 
-echo "(Optional) Skip shell history hooks: --no-shell-hooks" 
+echo "Uninstall:"
+echo "  sudo $0 --uninstall"
+echo "(Optional) Skip shell history hooks: --no-shell-hooks"
 echo
 exit 0

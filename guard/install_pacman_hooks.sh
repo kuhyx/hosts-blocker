@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-require_root() { if [[ $EUID -ne 0 ]]; then exec sudo -E bash "$0" "$@"; fi }
+require_root() { if [[ $EUID -ne 0 ]]; then exec sudo -E bash "$0" "$@"; fi; }
 require_root "$@"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ HOOKS_DIR="/etc/pacman.d/hooks"
 install -d -m 755 "$HOOKS_DIR"
 
 # Pre-transaction hook
-cat >"$HOOKS_DIR/10-unlock-etc-hosts.hook" <<'HOOK'
+cat > "$HOOKS_DIR/10-unlock-etc-hosts.hook" << 'HOOK'
 [Trigger]
 Operation = Upgrade
 Operation = Install
@@ -26,7 +26,7 @@ NeedsTargets
 HOOK
 
 # Post-transaction hook
-cat >"$HOOKS_DIR/90-relock-etc-hosts.hook" <<'HOOK'
+cat > "$HOOKS_DIR/90-relock-etc-hosts.hook" << 'HOOK'
 [Trigger]
 Operation = Upgrade
 Operation = Install
