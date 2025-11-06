@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Non-interactive pre-transaction hook to temporarily unlock /etc/hosts
 
+set -euo pipefail
+
 TARGET=/etc/hosts
 LOGTAG=hosts-guard-hook
 
