@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Non-interactive pre-transaction hook to temporarily unlock /etc/hosts
-
+# pacman-pre-unlock-hosts.sh - Temporarily unlock /etc/hosts before pacman
 set -euo pipefail
 
 # Source shared functions

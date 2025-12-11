@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Post-transaction hook to re-apply hosts guard protections (single-layer ro bind)
-
+# pacman-post-relock-hosts.sh - Re-apply hosts guard protections after pacman
 set -euo pipefail
 
 # Source shared functions
