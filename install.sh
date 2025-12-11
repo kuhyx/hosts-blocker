@@ -50,7 +50,7 @@ extract_custom_entries_from_script() {
 # Extract custom entries from the current /etc/hosts (entries after "# Custom blocking entries" marker)
 extract_custom_entries_from_hosts() {
 	local hosts_file="$1"
-	if [[ ! -f "$hosts_file" ]]; then
+	if [[ ! -f $hosts_file ]]; then
 		return
 	fi
 	sed -n '/^# Custom blocking entries$/,$p' "$hosts_file" |
@@ -61,7 +61,7 @@ extract_custom_entries_from_hosts() {
 
 # Load previously saved custom entries state
 load_saved_custom_entries() {
-	if [[ -f "$CUSTOM_ENTRIES_STATE_FILE" ]]; then
+	if [[ -f $CUSTOM_ENTRIES_STATE_FILE ]]; then
 		sort -u "$CUSTOM_ENTRIES_STATE_FILE"
 	fi
 }
@@ -77,7 +77,7 @@ save_custom_entries_state() {
 # Helper function to count non-empty lines
 count_lines() {
 	local input="$1"
-	if [[ -z "$input" ]]; then
+	if [[ -z $input ]]; then
 		echo 0
 	else
 		echo "$input" | grep -c . 2>/dev/null || echo 0
@@ -98,7 +98,7 @@ check_custom_entries_protection() {
 	# Get saved/existing entries (prefer state file, fall back to current /etc/hosts)
 	local saved_entries
 	saved_entries=$(load_saved_custom_entries)
-	if [[ -z "$saved_entries" ]]; then
+	if [[ -z $saved_entries ]]; then
 		# First run or state file missing - extract from current /etc/hosts if it has our marker
 		saved_entries=$(extract_custom_entries_from_hosts "/etc/hosts")
 	fi
