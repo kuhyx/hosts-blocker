@@ -2,7 +2,7 @@
 
 # Re-run with sudo if not root
 if [[ $EUID -ne 0 ]]; then
-	exec sudo -E bash "$0" "$@"
+  exec sudo -E bash "$0" "$@"
 fi
 
 # Options
@@ -11,18 +11,18 @@ FLUSH_DNS=0
 
 # Parse CLI flags
 for arg in "$@"; do
-	case "$arg" in
-	--flush-dns)
-		FLUSH_DNS=1
-		;;
-	--no-flush-dns)
-		FLUSH_DNS=0
-		;;
-	-h | --help)
-		echo "Usage: $0 [--flush-dns|--no-flush-dns]"
-		exit 0
-		;;
-	esac
+  case "$arg" in
+    --flush-dns)
+      FLUSH_DNS=1
+      ;;
+    --no-flush-dns)
+      FLUSH_DNS=0
+      ;;
+    -h | --help)
+      echo "Usage: $0 [--flush-dns|--no-flush-dns]"
+      exit 0
+      ;;
+  esac
 done
 
 # ============================================================================
@@ -39,136 +39,136 @@ CUSTOM_ENTRIES_STATE_FILE="/etc/hosts.custom-entries.state"
 # Extract custom blocked entries from a hosts file or heredoc section
 # Returns only the "0.0.0.0 domain.com" lines (normalized, sorted, unique)
 extract_custom_entries_from_script() {
-	# Extract entries from the heredoc in this script (between EOF markers after "Custom blocking entries")
-	local script_path="$1"
-	sed -n '/^# Custom blocking entries$/,/^EOF$/p' "$script_path" |
-		grep -E '^0\.0\.0\.0[[:space:]]+' |
-		awk '{print $2}' |
-		sort -u
+  # Extract entries from the heredoc in this script (between EOF markers after "Custom blocking entries")
+  local script_path="$1"
+  sed -n '/^# Custom blocking entries$/,/^EOF$/p' "$script_path" |
+    grep -E '^0\.0\.0\.0[[:space:]]+' |
+    awk '{print $2}' |
+    sort -u
 }
 
 # Extract custom entries from the current /etc/hosts (entries after "# Custom blocking entries" marker)
 extract_custom_entries_from_hosts() {
-	local hosts_file="$1"
-	if [[ ! -f $hosts_file ]]; then
-		return
-	fi
-	sed -n '/^# Custom blocking entries$/,$p' "$hosts_file" |
-		grep -E '^0\.0\.0\.0[[:space:]]+' |
-		awk '{print $2}' |
-		sort -u
+  local hosts_file="$1"
+  if [[ ! -f $hosts_file ]]; then
+    return
+  fi
+  sed -n '/^# Custom blocking entries$/,$p' "$hosts_file" |
+    grep -E '^0\.0\.0\.0[[:space:]]+' |
+    awk '{print $2}' |
+    sort -u
 }
 
 # Load previously saved custom entries state
 load_saved_custom_entries() {
-	if [[ -f $CUSTOM_ENTRIES_STATE_FILE ]]; then
-		sort -u "$CUSTOM_ENTRIES_STATE_FILE"
-	fi
+  if [[ -f $CUSTOM_ENTRIES_STATE_FILE ]]; then
+    sort -u "$CUSTOM_ENTRIES_STATE_FILE"
+  fi
 }
 
 # Save current custom entries to state file
 save_custom_entries_state() {
-	local entries="$1"
-	echo "$entries" | sort -u >"$CUSTOM_ENTRIES_STATE_FILE"
-	chmod 644 "$CUSTOM_ENTRIES_STATE_FILE"
-	chattr +i "$CUSTOM_ENTRIES_STATE_FILE" 2>/dev/null || true
+  local entries="$1"
+  echo "$entries" | sort -u > "$CUSTOM_ENTRIES_STATE_FILE"
+  chmod 644 "$CUSTOM_ENTRIES_STATE_FILE"
+  chattr +i "$CUSTOM_ENTRIES_STATE_FILE" 2> /dev/null || true
 }
 
 # Helper function to count non-empty lines
 count_lines() {
-	local input="$1"
-	if [[ -z $input ]]; then
-		echo 0
-	else
-		echo "$input" | grep -c . 2>/dev/null || echo 0
-	fi
+  local input="$1"
+  if [[ -z $input ]]; then
+    echo 0
+  else
+    echo "$input" | grep -c . 2> /dev/null || echo 0
+  fi
 }
 
 # Main protection check
 check_custom_entries_protection() {
-	local script_path
-	script_path="$(readlink -f "$0")"
+  local script_path
+  script_path="$(readlink -f "$0")"
 
-	# Get new entries from the script's heredoc
-	local new_entries
-	new_entries=$(extract_custom_entries_from_script "$script_path")
-	local new_count
-	new_count=$(count_lines "$new_entries")
+  # Get new entries from the script's heredoc
+  local new_entries
+  new_entries=$(extract_custom_entries_from_script "$script_path")
+  local new_count
+  new_count=$(count_lines "$new_entries")
 
-	# Get saved/existing entries (prefer state file, fall back to current /etc/hosts)
-	local saved_entries
-	saved_entries=$(load_saved_custom_entries)
-	if [[ -z $saved_entries ]]; then
-		# First run or state file missing - extract from current /etc/hosts if it has our marker
-		saved_entries=$(extract_custom_entries_from_hosts "/etc/hosts")
-	fi
-	local saved_count
-	saved_count=$(count_lines "$saved_entries")
+  # Get saved/existing entries (prefer state file, fall back to current /etc/hosts)
+  local saved_entries
+  saved_entries=$(load_saved_custom_entries)
+  if [[ -z $saved_entries ]]; then
+    # First run or state file missing - extract from current /etc/hosts if it has our marker
+    saved_entries=$(extract_custom_entries_from_hosts "/etc/hosts")
+  fi
+  local saved_count
+  saved_count=$(count_lines "$saved_entries")
 
-	# If no saved state exists, this is first installation - allow it
-	if [[ $saved_count -eq 0 ]]; then
-		echo "ℹ️  First installation detected - no protection check needed."
-		return 0
-	fi
+  # If no saved state exists, this is first installation - allow it
+  if [[ $saved_count -eq 0 ]]; then
+    echo "ℹ️  First installation detected - no protection check needed."
+    return 0
+  fi
 
-	# Find entries that were removed
-	local removed_entries
-	removed_entries=$(comm -23 <(echo "$saved_entries") <(echo "$new_entries"))
-	local removed_count
-	removed_count=$(count_lines "$removed_entries")
+  # Find entries that were removed
+  local removed_entries
+  removed_entries=$(comm -23 <(echo "$saved_entries") <(echo "$new_entries"))
+  local removed_count
+  removed_count=$(count_lines "$removed_entries")
 
-	# Find entries that are new
-	local added_entries
-	added_entries=$(comm -13 <(echo "$saved_entries") <(echo "$new_entries"))
-	local added_count
-	added_count=$(count_lines "$added_entries")
+  # Find entries that are new
+  local added_entries
+  added_entries=$(comm -13 <(echo "$saved_entries") <(echo "$new_entries"))
+  local added_count
+  added_count=$(count_lines "$added_entries")
 
-	echo ""
-	echo "📊 Custom Entries Protection Check:"
-	echo "   Previously blocked: $saved_count entries"
-	echo "   Currently in script: $new_count entries"
-	echo "   Removed: $removed_count | Added: $added_count"
+  echo ""
+  echo "📊 Custom Entries Protection Check:"
+  echo "   Previously blocked: $saved_count entries"
+  echo "   Currently in script: $new_count entries"
+  echo "   Removed: $removed_count | Added: $added_count"
 
-	# RULE 1: No entries removed - always OK
-	if [[ $removed_count -eq 0 ]]; then
-		echo "   ✅ No entries removed - protection check passed."
-		return 0
-	fi
+  # RULE 1: No entries removed - always OK
+  if [[ $removed_count -eq 0 ]]; then
+    echo "   ✅ No entries removed - protection check passed."
+    return 0
+  fi
 
-	# RULE 2: Entries were removed - BLOCK INSTALLATION
-	echo ""
-	echo "============================================================"
-	echo "  ❌ INSTALLATION BLOCKED - CUSTOM ENTRIES REMOVED"
-	echo "============================================================"
-	echo ""
-	echo "You are attempting to REMOVE the following blocked entries:"
-	while IFS= read -r entry; do
-		echo "  - $entry"
-	done <<<"$removed_entries"
-	echo ""
-	echo "This is NOT allowed. The only way to unblock sites is to:"
-	echo ""
-	echo "  1. Manually edit /etc/hosts (requires removing chattr protection)"
-	echo "  2. Delete the state file /etc/hosts.custom-entries.state"
-	echo "     (also protected with chattr)"
-	echo ""
-	echo "These manual steps are intentionally difficult to prevent"
-	echo "impulsive unblocking. If you really need to unblock something,"
-	echo "you'll have to work for it."
-	echo ""
-	return 1
+  # RULE 2: Entries were removed - BLOCK INSTALLATION
+  echo ""
+  echo "============================================================"
+  echo "  ❌ INSTALLATION BLOCKED - CUSTOM ENTRIES REMOVED"
+  echo "============================================================"
+  echo ""
+  echo "You are attempting to REMOVE the following blocked entries:"
+  while IFS= read -r entry; do
+    echo "  - $entry"
+  done <<< "$removed_entries"
+  echo ""
+  echo "This is NOT allowed. The only way to unblock sites is to:"
+  echo ""
+  echo "  1. Manually edit /etc/hosts (requires removing chattr protection)"
+  echo "  2. Delete the state file /etc/hosts.custom-entries.state"
+  echo "     (also protected with chattr)"
+  echo ""
+  echo "These manual steps are intentionally difficult to prevent"
+  echo "impulsive unblocking. If you really need to unblock something,"
+  echo "you'll have to work for it."
+  echo ""
+  return 1
 }
 
 # Run the protection check
 if ! check_custom_entries_protection; then
-	exit 1
+  exit 1
 fi
 
 # Enable systemd-resolved
 sudo systemctl enable systemd-resolved
 
 # Remove all attributes from /etc/hosts to allow modifications
-sudo chattr -i -a /etc/hosts 2>/dev/null || true
+sudo chattr -i -a /etc/hosts 2> /dev/null || true
 
 # Source and local cache configuration
 URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts"
@@ -177,33 +177,33 @@ LOCAL_CACHE="/etc/hosts.stevenblack"
 
 # Helpers
 extract_date_epoch_from_file() {
-	# Grep "# Date:" line and convert to epoch seconds (UTC)
-	local f="$1"
-	local line
-	line=$(grep -m1 '^# Date:' "$f" 2>/dev/null | sed -E 's/^# Date:[[:space:]]*(.*)[[:space:]]*\(UTC\).*/\1 UTC/')
-	if [[ -n $line ]]; then
-		date -u -d "$line" +%s 2>/dev/null || echo ""
-	else
-		echo ""
-	fi
+  # Grep "# Date:" line and convert to epoch seconds (UTC)
+  local f="$1"
+  local line
+  line=$(grep -m1 '^# Date:' "$f" 2> /dev/null | sed -E 's/^# Date:[[:space:]]*(.*)[[:space:]]*\(UTC\).*/\1 UTC/')
+  if [[ -n $line ]]; then
+    date -u -d "$line" +%s 2> /dev/null || echo ""
+  else
+    echo ""
+  fi
 }
 
 fetch_remote_header() {
-	# Try to fetch only the first ~4KB using HTTP Range; fallback to piping to head
-	local out="$1"
-	if curl -LfsS --max-time 10 -H 'Range: bytes=0-4095' "$URL" -o "$out"; then
-		return 0
-	fi
-	# Fallback – may download more, but we only keep first lines
-	if curl -LfsS --max-time 10 "$URL" | head -n 20 >"$out"; then
-		return 0
-	fi
-	return 1
+  # Try to fetch only the first ~4KB using HTTP Range; fallback to piping to head
+  local out="$1"
+  if curl -LfsS --max-time 10 -H 'Range: bytes=0-4095' "$URL" -o "$out"; then
+    return 0
+  fi
+  # Fallback – may download more, but we only keep first lines
+  if curl -LfsS --max-time 10 "$URL" | head -n 20 > "$out"; then
+    return 0
+  fi
+  return 1
 }
 
 download_remote_full_to() {
-	local out="$1"
-	curl -LfsS "$URL" -o "$out"
+  local out="$1"
+  curl -LfsS "$URL" -o "$out"
 }
 
 # Decide whether to use cache or update
@@ -212,47 +212,47 @@ trap 'rm -f "$TMP_REMOTE_HEAD"' EXIT
 
 REMOTE_AVAILABLE=0
 if fetch_remote_header "$TMP_REMOTE_HEAD"; then
-	REMOTE_AVAILABLE=1
+  REMOTE_AVAILABLE=1
 fi
 
 NEED_UPDATE=0
 
 if [[ -f $LOCAL_CACHE ]]; then
-	local_epoch=$(extract_date_epoch_from_file "$LOCAL_CACHE")
+  local_epoch=$(extract_date_epoch_from_file "$LOCAL_CACHE")
 else
-	local_epoch=""
+  local_epoch=""
 fi
 
 if [[ $REMOTE_AVAILABLE -eq 1 ]]; then
-	remote_epoch=$(extract_date_epoch_from_file "$TMP_REMOTE_HEAD")
-	if [[ -n $local_epoch && -n $remote_epoch && $local_epoch -ge $remote_epoch ]]; then
-		echo "Using cached StevenBlack hosts (up-to-date)."
-	else
-		echo "Cached version is missing or outdated; downloading latest StevenBlack hosts..."
-		NEED_UPDATE=1
-	fi
+  remote_epoch=$(extract_date_epoch_from_file "$TMP_REMOTE_HEAD")
+  if [[ -n $local_epoch && -n $remote_epoch && $local_epoch -ge $remote_epoch ]]; then
+    echo "Using cached StevenBlack hosts (up-to-date)."
+  else
+    echo "Cached version is missing or outdated; downloading latest StevenBlack hosts..."
+    NEED_UPDATE=1
+  fi
 else
-	if [[ -f $LOCAL_CACHE ]]; then
-		echo "No internet; using cached StevenBlack hosts."
-	else
-		echo "Error: No internet and no cached StevenBlack hosts found." >&2
-		exit 1
-	fi
+  if [[ -f $LOCAL_CACHE ]]; then
+    echo "No internet; using cached StevenBlack hosts."
+  else
+    echo "Error: No internet and no cached StevenBlack hosts found." >&2
+    exit 1
+  fi
 fi
 
 # Ensure we have a fresh cache if needed
 if [[ $NEED_UPDATE -eq 1 ]]; then
-	TMP_DL=$(mktemp)
-	if download_remote_full_to "$TMP_DL"; then
-		# Save raw upstream to cache
-		sudo mv "$TMP_DL" "$LOCAL_CACHE"
-		sudo chmod 644 "$LOCAL_CACHE"
-		echo "Saved latest StevenBlack hosts to cache: $LOCAL_CACHE"
-	else
-		rm -f "$TMP_DL"
-		echo "Error: Failed to download latest StevenBlack hosts." >&2
-		exit 1
-	fi
+  TMP_DL=$(mktemp)
+  if download_remote_full_to "$TMP_DL"; then
+    # Save raw upstream to cache
+    sudo mv "$TMP_DL" "$LOCAL_CACHE"
+    sudo chmod 644 "$LOCAL_CACHE"
+    echo "Saved latest StevenBlack hosts to cache: $LOCAL_CACHE"
+  else
+    rm -f "$TMP_DL"
+    echo "Error: Failed to download latest StevenBlack hosts." >&2
+    exit 1
+  fi
 fi
 
 # Install the base hosts from cache into /etc/hosts
@@ -272,7 +272,7 @@ sudo sed -i 's/^0\.0\.0\.0 messenger\.com/#0.0.0.0 messenger.com/' /etc/hosts
 
 # Add custom entries for YouTube and Discord
 echo "Adding custom entries for YouTube and Discord..."
-tee -a /etc/hosts >/dev/null <<'EOF'
+tee -a /etc/hosts > /dev/null << 'EOF'
 
 # Custom blocking entries
 # YouTube
@@ -407,17 +407,17 @@ echo "Saving custom entries state for protection mechanism..."
 script_path="$(readlink -f "$0")"
 current_custom_entries=$(extract_custom_entries_from_script "$script_path")
 # Remove immutable from state file if it exists
-chattr -i "$CUSTOM_ENTRIES_STATE_FILE" 2>/dev/null || true
+chattr -i "$CUSTOM_ENTRIES_STATE_FILE" 2> /dev/null || true
 save_custom_entries_state "$current_custom_entries"
 echo "✅ Custom entries state saved to $CUSTOM_ENTRIES_STATE_FILE"
 
 # Optionally flush DNS caches
 if [[ $FLUSH_DNS -eq 1 ]]; then
-	echo "Flushing DNS caches..."
-	sudo systemd-resolve --flush-caches
-	sudo systemctl restart NetworkManager.service
+  echo "Flushing DNS caches..."
+  sudo systemd-resolve --flush-caches
+  sudo systemctl restart NetworkManager.service
 else
-	echo "DNS cache flush skipped (use --flush-dns to enable)."
+  echo "DNS cache flush skipped (use --flush-dns to enable)."
 fi
 
 echo ""

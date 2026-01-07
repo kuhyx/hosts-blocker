@@ -16,7 +16,7 @@ collapse_mounts
 
 # Run enforcement script if available
 if [[ -x $ENFORCE ]]; then
-	"$ENFORCE" >/dev/null 2>&1 || true
+  "$ENFORCE" > /dev/null 2>&1 || true
 fi
 
 # Apply protections
