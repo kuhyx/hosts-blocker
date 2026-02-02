@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch /etc/nsswitch.conf for tampering (hosts bypass protection)
+
+[Path]
+PathChanged=/etc/nsswitch.conf
+Unit=nsswitch-guard.service
+
+[Install]
+WantedBy=multi-user.target

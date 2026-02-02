@@ -1,0 +1,12 @@
+[Unit]
+Description=Enforce canonical /etc/nsswitch.conf (prevents hosts bypass)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/enforce-nsswitch.sh
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

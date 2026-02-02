@@ -9,6 +9,7 @@ source "$SCRIPT_DIR/hosts-guard-common.sh"
 
 # Remove protective attributes
 remove_host_attrs
+sudo rm /etc/hosts
 
 # Stop guard services
 stop_units_if_present
@@ -20,7 +21,7 @@ collapse_mounts
 
 # Ensure writable by remounting if still read-only
 if is_ro_mount; then
-  mount -o remount,rw "$TARGET" > /dev/null 2>&1 || collapse_mounts
+	mount -o remount,rw "$TARGET" >/dev/null 2>&1 || collapse_mounts
 fi
 
 log_hook "pre" "unlocking(done)"

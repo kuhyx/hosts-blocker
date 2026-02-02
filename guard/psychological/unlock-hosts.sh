@@ -17,30 +17,30 @@ require_root "$@"
 echo "Reason for editing /etc/hosts (will be logged):" >&2
 read -r -p "Enter reason: " REASON
 if [[ -z ${REASON// /} ]]; then
-  echo "Empty reason not allowed. Aborting." >&2
-  exit 1
+	echo "Empty reason not allowed. Aborting." >&2
+	exit 1
 fi
 log "Requested intentional /etc/hosts modification session. Reason: $REASON"
 logger -t "$SYSLOG_TAG" "session_start user=${SUDO_USER:-$USER} reason='$REASON'"
 echo "This action is logged. A cooling-off delay of $DELAY_SECONDS seconds applies." >&2
 
 for s in hosts-bind-mount.service hosts-guard.path; do
-  if systemctl is-active --quiet "$s"; then
-    log "Stopping $s"
-    systemctl stop "$s" || true
-  fi
-  if systemctl is-enabled --quiet "$s"; then
-    log "(Will re-enable later)"
-  fi
+	if systemctl is-active --quiet "$s"; then
+		log "Stopping $s"
+		systemctl stop "$s" || true
+	fi
+	if systemctl is-enabled --quiet "$s"; then
+		log "(Will re-enable later)"
+	fi
 done
 
 # Remove attributes to allow edit
-chattr -i -a "$TARGET" 2> /dev/null || true
+chattr -i -a "$TARGET" 2>/dev/null || true
 
 echo "Countdown:" >&2
 for ((i = DELAY_SECONDS; i > 0; i--)); do
-  printf '\rEdit window opens in %2d seconds... Press Ctrl+C to abort.' "$i" >&2
-  sleep 1
+	printf '\rEdit window opens in %2d seconds... Press Ctrl+C to abort.' "$i" >&2
+	sleep 1
 done
 echo >&2
 
@@ -50,12 +50,12 @@ sha_before=$(sha256sum "$TARGET" | awk '{print $1}')
 sha_after=$(sha256sum "$TARGET" | awk '{print $1}')
 
 if [[ $sha_before == "$sha_after" ]]; then
-  log "No changes made to $TARGET. Reason: $REASON"
-  logger -t "$SYSLOG_TAG" "no_change user=${SUDO_USER:-$USER} reason='$REASON'"
+	log "No changes made to $TARGET. Reason: $REASON"
+	logger -t "$SYSLOG_TAG" "no_change user=${SUDO_USER:-$USER} reason='$REASON'"
 else
-  log "Changes detected. Updating canonical copy and re-enforcing. Reason: $REASON"
-  logger -t "$SYSLOG_TAG" "modified user=${SUDO_USER:-$USER} reason='$REASON'"
-  cp "$TARGET" "$CANON"
+	log "Changes detected. Updating canonical copy and re-enforcing. Reason: $REASON"
+	logger -t "$SYSLOG_TAG" "modified user=${SUDO_USER:-$USER} reason='$REASON'"
+	cp "$TARGET" "$CANON"
 fi
 
 # Re-run enforcement
