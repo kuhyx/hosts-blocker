@@ -34,6 +34,7 @@ DO_SNAPSHOT=1
 ENABLE_BIND=1
 ENABLE_PATH=1
 ENABLE_NSSWITCH=1
+ENABLE_RESOLVED=1
 UNINSTALL=0
 DELAY=45
 DRY_RUN=0
@@ -87,6 +88,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--skip-nsswitch)
 		ENABLE_NSSWITCH=0
+		shift
+		;;
+	--skip-resolved)
+		ENABLE_RESOLVED=0
 		shift
 		;;
 	--delay)
@@ -157,14 +162,21 @@ UNIT_BIND_SERVICE="$SCRIPT_DIR/hosts-bind-mount.service"
 TEMPLATE_ENFORCE_NSSWITCH="$SCRIPT_DIR/enforce-nsswitch.sh"
 UNIT_NSSWITCH_SERVICE="$SCRIPT_DIR/nsswitch-guard.service"
 UNIT_NSSWITCH_PATH="$SCRIPT_DIR/nsswitch-guard.path"
+TEMPLATE_ENFORCE_RESOLVED="$SCRIPT_DIR/enforce-resolved.sh"
+UNIT_RESOLVED_SERVICE="$SCRIPT_DIR/resolved-guard.service"
+UNIT_RESOLVED_PATH="$SCRIPT_DIR/resolved-guard.path"
 
 INSTALL_ENFORCE="/usr/local/sbin/enforce-hosts.sh"
 INSTALL_UNLOCK="/usr/local/sbin/unlock-hosts"
 INSTALL_ENFORCE_NSSWITCH="/usr/local/sbin/enforce-nsswitch.sh"
+INSTALL_ENFORCE_RESOLVED="/usr/local/sbin/enforce-resolved.sh"
 CANON="/usr/local/share/locked-hosts"
 CANON_NSSWITCH="/usr/local/share/locked-nsswitch.conf"
+CANON_RESOLVED="/usr/local/share/locked-resolved.conf"
 HOSTS="/etc/hosts"
 NSSWITCH="/etc/nsswitch.conf"
+RESOLVED_CONF="/etc/systemd/resolved.conf"
+RESOLVED_DROPIN="/etc/systemd/resolved.conf.d"
 
 # Shell hook destinations (user agnostic system-wide skeleton + etc profile.d)
 ZSH_FILTER_SNIPPET="/etc/zsh/hosts_guard_history_filter.zsh"
@@ -177,7 +189,7 @@ SYSTEMD_DIR="/etc/systemd/system"
 ######################################################################
 if [[ $UNINSTALL -eq 1 ]]; then
 	note "Uninstalling hosts guard components ( protections removed )"
-	for u in hosts-guard.path hosts-guard.service hosts-bind-mount.service nsswitch-guard.path nsswitch-guard.service; do
+	for u in hosts-guard.path hosts-guard.service hosts-bind-mount.service nsswitch-guard.path nsswitch-guard.service resolved-guard.path resolved-guard.service; do
 		if systemctl list-unit-files | grep -q "^$u"; then
 			run systemctl disable --now "$u" || true
 		fi
@@ -186,16 +198,19 @@ if [[ $UNINSTALL -eq 1 ]]; then
 		"$INSTALL_ENFORCE" \
 		"$INSTALL_UNLOCK" \
 		"$INSTALL_ENFORCE_NSSWITCH" \
+		"$INSTALL_ENFORCE_RESOLVED" \
 		"$SYSTEMD_DIR/hosts-guard.service" \
 		"$SYSTEMD_DIR/hosts-guard.path" \
 		"$SYSTEMD_DIR/hosts-bind-mount.service" \
 		"$SYSTEMD_DIR/nsswitch-guard.service" \
 		"$SYSTEMD_DIR/nsswitch-guard.path" \
+		"$SYSTEMD_DIR/resolved-guard.service" \
+		"$SYSTEMD_DIR/resolved-guard.path" \
 		"$ZSH_FILTER_SNIPPET" \
 		"$BASH_FILTER_SNIPPET"; do
 		if [[ -e $f ]]; then run rm -f "$f"; fi
 	done
-	note "Leaving canonical snapshots at $CANON and $CANON_NSSWITCH (remove manually if undesired)."
+	note "Leaving canonical snapshots at $CANON, $CANON_NSSWITCH and $CANON_RESOLVED (remove manually if undesired)."
 	if [[ $DRY_RUN -eq 0 ]]; then systemctl daemon-reload; fi
 	msg "Uninstall complete"
 	exit 0
@@ -369,6 +384,8 @@ run install -m 644 "$UNIT_GUARD_PATH" "$SYSTEMD_DIR/hosts-guard.path"
 run install -m 644 "$UNIT_BIND_SERVICE" "$SYSTEMD_DIR/hosts-bind-mount.service"
 run install -m 644 "$UNIT_NSSWITCH_SERVICE" "$SYSTEMD_DIR/nsswitch-guard.service"
 run install -m 644 "$UNIT_NSSWITCH_PATH" "$SYSTEMD_DIR/nsswitch-guard.path"
+run install -m 644 "$UNIT_RESOLVED_SERVICE" "$SYSTEMD_DIR/resolved-guard.service"
+run install -m 644 "$UNIT_RESOLVED_PATH" "$SYSTEMD_DIR/resolved-guard.path"
 
 if [[ $DRY_RUN -eq 0 ]]; then systemctl daemon-reload; fi
 
@@ -432,6 +449,77 @@ else
 	note "Skipping nsswitch protection (--skip-nsswitch)"
 fi
 
+if [[ $ENABLE_RESOLVED -eq 1 ]]; then
+	msg "Enabling resolved.conf protection (hosts bypass prevention)"
+	msg "Installing resolved enforcement script -> $INSTALL_ENFORCE_RESOLVED"
+	run install -m 755 "$TEMPLATE_ENFORCE_RESOLVED" "$INSTALL_ENFORCE_RESOLVED"
+
+	# Ensure ReadEtcHosts=yes in resolved.conf before snapshotting
+	if [[ -f "$RESOLVED_CONF" ]]; then
+		local_read_hosts=$(grep -E '^\s*ReadEtcHosts\s*=' "$RESOLVED_CONF" 2>/dev/null |
+			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
+		if [[ "$local_read_hosts" != "yes" ]]; then
+			msg "Fixing ReadEtcHosts in resolved.conf (was: '$local_read_hosts')"
+			chattr -i "$RESOLVED_CONF" 2>/dev/null || true
+			if grep -qE '^\s*ReadEtcHosts\s*=' "$RESOLVED_CONF"; then
+				run sed -i -E 's/^\s*ReadEtcHosts\s*=.*/ReadEtcHosts=yes/' "$RESOLVED_CONF"
+			elif grep -q '^\[Resolve\]' "$RESOLVED_CONF"; then
+				run sed -i '/^\[Resolve\]/a ReadEtcHosts=yes' "$RESOLVED_CONF"
+			else
+				printf '\n[Resolve]\nReadEtcHosts=yes\n' >>"$RESOLVED_CONF"
+			fi
+			msg "resolved.conf ReadEtcHosts fixed: $(grep 'ReadEtcHosts' "$RESOLVED_CONF")"
+		fi
+
+		# Ensure DNSOverTLS is not set to yes or opportunistic
+		local_dot=$(grep -E '^\s*DNSOverTLS\s*=' "$RESOLVED_CONF" 2>/dev/null |
+			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
+		if [[ -n "$local_dot" && "$local_dot" != "no" ]]; then
+			msg "Disabling DNSOverTLS in resolved.conf (was: '$local_dot')"
+			chattr -i "$RESOLVED_CONF" 2>/dev/null || true
+			run sed -i -E 's/^\s*DNSOverTLS\s*=.*/#DNSOverTLS=no/' "$RESOLVED_CONF"
+		fi
+	fi
+
+	# Lock drop-in directory to prevent override files
+	if [[ -d "$RESOLVED_DROPIN" ]]; then
+		# Remove any existing drop-in overrides
+		local_count=$(find "$RESOLVED_DROPIN" -name '*.conf' -type f 2>/dev/null | wc -l)
+		if [[ "$local_count" -gt 0 ]]; then
+			warn "Removing $local_count drop-in override(s) from $RESOLVED_DROPIN"
+			find "$RESOLVED_DROPIN" -name '*.conf' -type f -delete
+		fi
+		chattr +i "$RESOLVED_DROPIN" 2>/dev/null || warn "Failed to lock $RESOLVED_DROPIN"
+	else
+		run mkdir -p "$RESOLVED_DROPIN"
+		chattr +i "$RESOLVED_DROPIN" 2>/dev/null || warn "Failed to lock $RESOLVED_DROPIN"
+	fi
+
+	# Create resolved.conf canonical snapshot if needed
+	if [[ -f "$RESOLVED_CONF" ]]; then
+		if [[ ! -f "$CANON_RESOLVED" ]]; then
+			msg "Creating canonical resolved.conf snapshot at $CANON_RESOLVED"
+			run cp "$RESOLVED_CONF" "$CANON_RESOLVED"
+			run chmod 644 "$CANON_RESOLVED"
+			chattr +i "$CANON_RESOLVED" 2>/dev/null || warn "Failed to protect canonical resolved copy"
+		fi
+	fi
+
+	run systemctl enable --now resolved-guard.path
+
+	# Perform initial resolved enforcement
+	if [[ $DRY_RUN -eq 1 ]]; then
+		echo "DRY-RUN: would run $INSTALL_ENFORCE_RESOLVED"
+	else
+		"$INSTALL_ENFORCE_RESOLVED" || warn "resolved enforcement returned non-zero"
+	fi
+
+	# Restart resolved to pick up corrected config
+	run systemctl restart systemd-resolved
+else
+	note "Skipping resolved.conf protection (--skip-resolved)"
+fi
+
 msg "Performing initial hosts enforcement"
 if [[ $DRY_RUN -eq 1 ]]; then
 	echo "DRY-RUN: would run $INSTALL_ENFORCE"
@@ -446,13 +534,16 @@ echo
 msg "Hosts guard setup complete"
 echo "Canonical hosts copy: $CANON"
 echo "Canonical nsswitch copy: $CANON_NSSWITCH"
+echo "Canonical resolved copy: $CANON_RESOLVED"
 echo "Enforce script: $INSTALL_ENFORCE"
 echo "nsswitch enforce: $INSTALL_ENFORCE_NSSWITCH"
+echo "resolved enforce: $INSTALL_ENFORCE_RESOLVED"
 echo "Unlock command: sudo $INSTALL_UNLOCK"
 echo "Delay (seconds): $DELAY"
 echo "Auto-revert path watch: $([[ $ENABLE_PATH -eq 1 ]] && echo enabled || echo disabled)"
 echo "Read-only bind mount: $([[ $ENABLE_BIND -eq 1 ]] && echo enabled || echo disabled)"
 echo "nsswitch protection: $([[ $ENABLE_NSSWITCH -eq 1 ]] && echo enabled || echo disabled)"
+echo "resolved protection: $([[ $ENABLE_RESOLVED -eq 1 ]] && echo enabled || echo disabled)"
 echo "Shell history suppression: $([[ $INSTALL_SHELL_HOOKS -eq 1 ]] && echo enabled || echo disabled)"
 echo "Audit rule: $([[ $INSTALL_AUDIT_RULE -eq 1 ]] && echo enabled || echo disabled)"
 echo "Alias stub: $([[ $ADD_ALIAS_STUB -eq 1 ]] && echo enabled || echo disabled)"

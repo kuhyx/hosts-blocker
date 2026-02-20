@@ -3,6 +3,9 @@
 # This file is sourced by pacman-pre-unlock-hosts.sh and pacman-post-relock-hosts.sh
 
 TARGET=/etc/hosts
+NSSWITCH=/etc/nsswitch.conf
+RESOLVED_CONF=/etc/systemd/resolved.conf
+RESOLVED_DROPIN=/etc/systemd/resolved.conf.d
 LOGTAG=hosts-guard-hook
 
 # Check if target has a read-only mount
@@ -38,7 +41,7 @@ collapse_mounts() {
 
 # Stop systemd units related to hosts guard
 stop_units_if_present() {
-	local units=(hosts-bind-mount.service hosts-guard.path)
+	local units=(hosts-bind-mount.service hosts-guard.path nsswitch-guard.path resolved-guard.path)
 	for u in "${units[@]}"; do
 		if command -v systemctl >/dev/null 2>&1; then
 			if systemctl list-unit-files 2>/dev/null | grep -q "^$u"; then
@@ -48,24 +51,36 @@ stop_units_if_present() {
 	done
 }
 
-# Remove immutable/append-only attributes
-remove_host_attrs() {
-	if command -v lsattr >/dev/null 2>&1; then
-		local attrs
-		attrs=$(lsattr -d "$TARGET" 2>/dev/null || true)
-		if echo "$attrs" | grep -q " i "; then
-			chattr -i "$TARGET" >/dev/null 2>&1 || true
-		fi
-		if echo "$attrs" | grep -q " a "; then
-			chattr -a "$TARGET" >/dev/null 2>&1 || true
-		fi
+# Remove immutable/append-only attributes from a file
+_remove_attrs_for() {
+	local f="$1"
+	if [[ -e "$f" ]] && command -v lsattr >/dev/null 2>&1; then
+		chattr -ia "$f" >/dev/null 2>&1 || true
 	fi
 }
 
-# Apply immutable attribute
+# Remove immutable/append-only attributes from all guarded files
+remove_host_attrs() {
+	_remove_attrs_for "$TARGET"
+}
+
+remove_all_guard_attrs() {
+	_remove_attrs_for "$TARGET"
+	_remove_attrs_for "$NSSWITCH"
+	_remove_attrs_for "$RESOLVED_CONF"
+	_remove_attrs_for "$RESOLVED_DROPIN"
+}
+
+# Apply immutable attribute to all guarded files
 apply_immutable() {
 	if command -v chattr >/dev/null 2>&1; then
 		chattr +i "$TARGET" >/dev/null 2>&1 || true
+		chattr +i "$NSSWITCH" >/dev/null 2>&1 || true
+		chattr +i "$RESOLVED_CONF" >/dev/null 2>&1 || true
+		# Lock drop-in dir to prevent creation of override files
+		if [[ -d "$RESOLVED_DROPIN" ]]; then
+			chattr +i "$RESOLVED_DROPIN" >/dev/null 2>&1 || true
+		fi
 	fi
 }
 
@@ -75,10 +90,12 @@ apply_ro_bind_mount() {
 	mount -o remount,ro,bind "$TARGET" >/dev/null 2>&1 || true
 }
 
-# Start the path watcher service
+# Start all path watcher services
 start_path_watcher() {
 	if command -v systemctl >/dev/null 2>&1; then
 		systemctl start hosts-guard.path >/dev/null 2>&1 || true
+		systemctl start nsswitch-guard.path >/dev/null 2>&1 || true
+		systemctl start resolved-guard.path >/dev/null 2>&1 || true
 	fi
 }
 

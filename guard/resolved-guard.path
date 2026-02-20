@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch /etc/systemd/resolved.conf for tampering (hosts bypass protection)
+
+[Path]
+PathChanged=/etc/systemd/resolved.conf
+PathChanged=/etc/systemd/resolved.conf.d
+Unit=resolved-guard.service
+
+[Install]
+WantedBy=multi-user.target
