@@ -394,6 +394,22 @@ if [[ $ENABLE_NSSWITCH -eq 1 ]]; then
 	msg "Installing nsswitch enforcement script -> $INSTALL_ENFORCE_NSSWITCH"
 	run install -m 755 "$TEMPLATE_ENFORCE_NSSWITCH" "$INSTALL_ENFORCE_NSSWITCH"
 
+	# Ensure 'files' is present in the hosts line before snapshotting
+	if [[ -f "$NSSWITCH" ]]; then
+		hosts_line=$(grep '^hosts:' "$NSSWITCH" 2>/dev/null || echo "")
+		if [[ -n "$hosts_line" ]] && ! echo "$hosts_line" | grep -qw 'files'; then
+			msg "Adding 'files' to nsswitch.conf hosts line (was: $hosts_line)"
+			if echo "$hosts_line" | grep -qw 'resolve'; then
+				run sed -i 's/^hosts:\(.*\)resolve/hosts: files\1resolve/' "$NSSWITCH"
+			elif echo "$hosts_line" | grep -qw 'dns'; then
+				run sed -i 's/^hosts:\(.*\)dns/hosts:\1files dns/' "$NSSWITCH"
+			else
+				run sed -i 's/^hosts:/hosts: files/' "$NSSWITCH"
+			fi
+			msg "nsswitch.conf hosts line fixed: $(grep '^hosts:' "$NSSWITCH")"
+		fi
+	fi
+
 	# Create nsswitch canonical snapshot if needed
 	if [[ -f "$NSSWITCH" ]]; then
 		if [[ ! -f "$CANON_NSSWITCH" ]]; then

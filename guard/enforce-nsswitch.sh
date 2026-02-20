@@ -69,9 +69,15 @@ if ! validate_hosts_line "$current_hosts_line"; then
 		log "ERROR: Canonical source not found at $CANONICAL_SOURCE"
 		# Emergency fix: add "files" back to hosts line
 		chattr -i "$TARGET" 2>/dev/null || true
-		sed -i 's/^hosts:\(.*\)dns/hosts:\1files dns/' "$TARGET"
+		if grep -q '^hosts:.*dns' "$TARGET"; then
+			sed -i 's/^hosts:\(.*\)dns/hosts:\1files dns/' "$TARGET"
+		elif grep -q '^hosts:.*resolve' "$TARGET"; then
+			sed -i 's/^hosts:\(.*\)resolve/hosts: files\1resolve/' "$TARGET"
+		else
+			sed -i 's/^hosts:/hosts: files/' "$TARGET"
+		fi
 		chattr +i "$TARGET" 2>/dev/null || true
-		log "Emergency fix applied: added 'files' before 'dns'"
+		log "Emergency fix applied: added 'files' to hosts line"
 	fi
 	exit 0
 fi
