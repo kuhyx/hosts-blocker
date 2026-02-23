@@ -167,6 +167,26 @@ fi
 # Enable systemd-resolved
 sudo systemctl enable systemd-resolved
 
+# ============================================================================
+# ENSURE systemd-resolved READS /etc/hosts
+# ============================================================================
+# Without this, systemd-resolved ignores /etc/hosts entries entirely,
+# allowing blocked domains to resolve via DNS.
+RESOLVED_CONF="/etc/systemd/resolved.conf"
+if grep -q '^ReadEtcHosts=no' "$RESOLVED_CONF" 2>/dev/null; then
+	echo "Fixing systemd-resolved: setting ReadEtcHosts=yes..."
+	sudo sed -i 's/^ReadEtcHosts=no/ReadEtcHosts=yes/' "$RESOLVED_CONF"
+	sudo systemctl restart systemd-resolved
+elif ! grep -q '^ReadEtcHosts=yes' "$RESOLVED_CONF" 2>/dev/null; then
+	echo "Enabling ReadEtcHosts=yes in systemd-resolved..."
+	if grep -q '^#ReadEtcHosts=' "$RESOLVED_CONF" 2>/dev/null; then
+		sudo sed -i 's/^#ReadEtcHosts=.*/ReadEtcHosts=yes/' "$RESOLVED_CONF"
+	else
+		echo 'ReadEtcHosts=yes' | sudo tee -a "$RESOLVED_CONF" >/dev/null
+	fi
+	sudo systemctl restart systemd-resolved
+fi
+
 # Remove all attributes from /etc/hosts to allow modifications
 sudo chattr -i -a /etc/hosts 2>/dev/null || true
 
@@ -427,14 +447,41 @@ tee -a /etc/hosts >/dev/null <<'EOF'
 0.0.0.0 m.jush.pl
 0.0.0.0 api.jush.pl
 0.0.0.0 delio.pl
+:: delio.pl
 0.0.0.0 www.delio.pl
+:: www.delio.pl
 0.0.0.0 m.delio.pl
+:: m.delio.pl
 0.0.0.0 api.delio.pl
+:: api.delio.pl
+0.0.0.0 app.delio.pl
+:: app.delio.pl
+0.0.0.0 cdn.delio.pl
+:: cdn.delio.pl
+0.0.0.0 static.delio.pl
+:: static.delio.pl
+0.0.0.0 order.delio.pl
+:: order.delio.pl
 0.0.0.0 delio.com
+:: delio.com
 0.0.0.0 www.delio.com
+:: www.delio.com
+0.0.0.0 m.delio.com
+:: m.delio.com
+0.0.0.0 api.delio.com
+:: api.delio.com
+0.0.0.0 app.delio.com
+:: app.delio.com
 0.0.0.0 delio.com.pl
+:: delio.com.pl
 0.0.0.0 www.delio.com.pl
+:: www.delio.com.pl
+0.0.0.0 m.delio.com.pl
+:: m.delio.com.pl
 0.0.0.0 api.delio.com.pl
+:: api.delio.com.pl
+0.0.0.0 app.delio.com.pl
+:: app.delio.com.pl
 0.0.0.0 lisek.app
 0.0.0.0 www.lisek.app
 0.0.0.0 api.lisek.app
@@ -560,13 +607,8 @@ EOF
 # Set proper permissions (readable by all, writable only by root)
 sudo chmod 644 /etc/hosts
 
-# Make the file immutable (prevents deletion, renaming, and most modifications)
-sudo chattr +i /etc/hosts
-
-# Also set append-only attribute as additional protection
-# Note: This requires removing immutable first, then setting both
-sudo chattr -i /etc/hosts
-sudo chattr +a /etc/hosts
+# Make the file immutable and append-only for maximum protection
+sudo chattr +ia /etc/hosts
 
 # ============================================================================
 # SAVE CUSTOM ENTRIES STATE FOR FUTURE PROTECTION CHECKS
