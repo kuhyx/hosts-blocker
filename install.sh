@@ -187,6 +187,27 @@ elif ! grep -q '^ReadEtcHosts=yes' "$RESOLVED_CONF" 2>/dev/null; then
 	sudo systemctl restart systemd-resolved
 fi
 
+# ============================================================================
+# TEMPORARILY DISABLE HOSTS GUARD PROTECTIONS FOR INSTALLATION
+# ============================================================================
+# The guard system uses a read-only bind mount and path watcher that prevent
+# any writes to /etc/hosts. We must stop them before installing, then restart.
+GUARD_SERVICES_STOPPED=0
+
+for svc in hosts-bind-mount.service hosts-guard.path; do
+	if systemctl is-active --quiet "$svc" 2>/dev/null; then
+		echo "Stopping $svc for installation..."
+		systemctl stop "$svc" 2>/dev/null || true
+		GUARD_SERVICES_STOPPED=1
+	fi
+done
+
+# If bind mount is still active, unmount it
+if findmnt /etc/hosts >/dev/null 2>&1; then
+	echo "Unmounting read-only bind mount on /etc/hosts..."
+	umount /etc/hosts 2>/dev/null || mount -o remount,rw,bind /etc/hosts 2>/dev/null || true
+fi
+
 # Remove all attributes from /etc/hosts to allow modifications
 sudo chattr -i -a /etc/hosts 2>/dev/null || true
 
@@ -372,6 +393,11 @@ tee -a /etc/hosts >/dev/null <<'EOF'
 0.0.0.0 invidious.io.lol
 
 # Steam Store
+0.0.0.0 store.steampowered.com
+0.0.0.0 checkout.steampowered.com
+0.0.0.0 store.akamai.steamstatic.com
+0.0.0.0 storefront.steampowered.com
+0.0.0.0 store.cloudflare.steamstatic.com
 
 # Discord - media allowed
 # 0.0.0.0 cdn.discordapp.com
@@ -609,6 +635,24 @@ sudo chmod 644 /etc/hosts
 
 # Make the file immutable and append-only for maximum protection
 sudo chattr +ia /etc/hosts
+
+# ============================================================================
+# RESTART HOSTS GUARD SERVICES
+# ============================================================================
+if [[ $GUARD_SERVICES_STOPPED -eq 1 ]]; then
+	echo "Restarting hosts guard services..."
+	# Update the canonical copy so the guard doesn't revert our changes
+	if [[ -f /usr/local/share/locked-hosts ]]; then
+		cp /etc/hosts /usr/local/share/locked-hosts
+		echo "  Updated canonical snapshot."
+	fi
+	for svc in hosts-bind-mount.service hosts-guard.path; do
+		if systemctl is-enabled --quiet "$svc" 2>/dev/null; then
+			systemctl start "$svc" 2>/dev/null || true
+			echo "  Restarted $svc"
+		fi
+	done
+fi
 
 # ============================================================================
 # SAVE CUSTOM ENTRIES STATE FOR FUTURE PROTECTION CHECKS
