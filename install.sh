@@ -311,6 +311,11 @@ sudo sed -i 's/^0\.0\.0\.0 www\.4chan\.org/#0.0.0.0 www.4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 www\.facebook\.com/#0.0.0.0 www.facebook.com/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 messenger\.com/#0.0.0.0 messenger.com/' /etc/hosts
 
+# Allow LinkedIn and all subdomains (linkedin.com + licdn.com CDN)
+echo "Allowing LinkedIn by commenting out any blocking entries..."
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' /etc/hosts
+
 # Add custom entries for YouTube and Discord
 echo "Adding custom entries for YouTube and Discord..."
 tee -a /etc/hosts >/dev/null <<'EOF'
