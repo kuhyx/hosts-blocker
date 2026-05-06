@@ -43,6 +43,7 @@ HOOK
 
 # Place helper scripts into a shared location
 install -d -m 755 /usr/local/share/hosts-guard
+install -m 755 "$SCRIPT_DIR/pacman-hooks/hosts-guard-common.sh" /usr/local/share/hosts-guard/
 install -m 755 "$SCRIPT_DIR/pacman-hooks/pacman-pre-unlock-hosts.sh" /usr/local/share/hosts-guard/
 install -m 755 "$SCRIPT_DIR/pacman-hooks/pacman-post-relock-hosts.sh" /usr/local/share/hosts-guard/
 

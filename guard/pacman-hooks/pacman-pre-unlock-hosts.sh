@@ -8,14 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=hosts-guard-common.sh
 source "$SCRIPT_DIR/hosts-guard-common.sh"
 
+require_root
+
+log_hook "pre" "unlocking(start)"
+
 # Remove protective attributes from all guarded files
 remove_all_guard_attrs
-sudo rm /etc/hosts
 
 # Stop guard services (hosts, nsswitch, resolved watchers)
 stop_units_if_present
-
-log_hook "pre" "unlocking(start)"
 
 # Collapse any existing mount layers
 collapse_mounts

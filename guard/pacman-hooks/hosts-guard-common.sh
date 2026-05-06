@@ -8,6 +8,13 @@ RESOLVED_CONF=/etc/systemd/resolved.conf
 RESOLVED_DROPIN=/etc/systemd/resolved.conf.d
 LOGTAG=hosts-guard-hook
 
+require_root() {
+	if [[ $EUID -ne 0 ]]; then
+		echo "hosts-guard pacman hook must run as root" >&2
+		exit 1
+	fi
+}
+
 # Check if target has a read-only mount
 is_ro_mount() {
 	findmnt -no OPTIONS -T "$TARGET" 2>/dev/null | grep -qw ro

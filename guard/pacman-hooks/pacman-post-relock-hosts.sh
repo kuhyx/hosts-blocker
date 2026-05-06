@@ -8,6 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=hosts-guard-common.sh
 source "$SCRIPT_DIR/hosts-guard-common.sh"
 
+require_root
+
 ENFORCE=/usr/local/sbin/enforce-hosts.sh
 ENFORCE_NSSWITCH=/usr/local/sbin/enforce-nsswitch.sh
 ENFORCE_RESOLVED=/usr/local/sbin/enforce-resolved.sh
