@@ -35,6 +35,7 @@ done
 # ============================================================================
 
 CUSTOM_ENTRIES_STATE_FILE="/etc/hosts.custom-entries.state"
+UNBLOCK_STATE_FILE="/etc/hosts.unblock-entries.state"
 
 # Extract custom blocked entries from a hosts file or heredoc section
 # Returns only the "0.0.0.0 domain.com" lines (normalized, sorted, unique)
@@ -161,6 +162,105 @@ check_custom_entries_protection() {
 
 # Run the protection check
 if ! check_custom_entries_protection; then
+	exit 1
+fi
+
+# ============================================================================
+# UNBLOCK ENTRIES PROTECTION MECHANISM
+# ============================================================================
+# This prevents silently expanding the whitelist (i.e. adding MORE domains to
+# the sed unblock list) by tracking which domains are whitelisted.  Adding a
+# new domain here requires manually clearing the state file first.
+# ============================================================================
+#
+# PROTECTED_UNBLOCK_LIST_START
+# 4chan.com
+# www.4chan.com
+# 4chan.org
+# boards.4chan.org
+# sys.4chan.org
+# www.4chan.org
+# www.facebook.com
+# messenger.com
+# delio.com.pl
+# loverslab.com
+# linkedin.com
+# licdn.com
+# PROTECTED_UNBLOCK_LIST_END
+
+# Extract whitelisted domains from the protected list embedded in this script
+extract_unblock_entries_from_script() {
+	local script_path="$1"
+	sed -n '/^# PROTECTED_UNBLOCK_LIST_START$/,/^# PROTECTED_UNBLOCK_LIST_END$/p' "$script_path" |
+		grep -E '^# [a-zA-Z0-9._-]+$' |
+		sed 's/^# //' |
+		sort -u
+}
+
+# Save current unblock entries to immutable state file
+save_unblock_entries_state() {
+	local entries="$1"
+	chattr -i "$UNBLOCK_STATE_FILE" 2>/dev/null || true
+	echo "$entries" | sort -u >"$UNBLOCK_STATE_FILE"
+	chmod 644 "$UNBLOCK_STATE_FILE"
+	chattr +i "$UNBLOCK_STATE_FILE" 2>/dev/null || true
+}
+
+# Block installation if the unblock list has grown (more sites being whitelisted)
+check_unblock_entries_protection() {
+	local script_path
+	script_path="$(readlink -f "$0")"
+
+	local new_entries
+	new_entries=$(extract_unblock_entries_from_script "$script_path")
+	local new_count
+	new_count=$(count_lines "$new_entries")
+
+	if [[ ! -f $UNBLOCK_STATE_FILE ]]; then
+		echo "ℹ️  First unblock-list run — no protection check needed."
+		return 0
+	fi
+
+	local saved_entries
+	saved_entries=$(sort -u "$UNBLOCK_STATE_FILE")
+	local saved_count
+	saved_count=$(count_lines "$saved_entries")
+
+	# Entries added since last install
+	local added_entries
+	added_entries=$(comm -13 <(echo "$saved_entries") <(echo "$new_entries"))
+	local added_count
+	added_count=$(count_lines "$added_entries")
+
+	echo ""
+	echo "📊 Unblock Entries Protection Check:"
+	echo "   Previously whitelisted: $saved_count domains"
+	echo "   Currently in script:    $new_count domains"
+	echo "   Newly added: $added_count"
+
+	if [[ $added_count -eq 0 ]]; then
+		echo "   ✅ No new unblocks — protection check passed."
+		return 0
+	fi
+
+	echo ""
+	echo "============================================================"
+	echo "  ❌ INSTALLATION BLOCKED — NEW UNBLOCK ENTRIES DETECTED"
+	echo "============================================================"
+	echo ""
+	echo "You are attempting to WHITELIST these additional domains:"
+	while IFS= read -r entry; do
+		echo "  + $entry"
+	done <<<"$added_entries"
+	echo ""
+	echo "To proceed, manually delete the state file first:"
+	echo "  sudo chattr -i $UNBLOCK_STATE_FILE && sudo rm $UNBLOCK_STATE_FILE"
+	echo ""
+	return 1
+}
+
+# Run the unblock protection check
+if ! check_unblock_entries_protection; then
 	exit 1
 fi
 
@@ -310,11 +410,14 @@ sudo sed -i 's/^0\.0\.0\.0 sys\.4chan\.org/#0.0.0.0 sys.4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 www\.4chan\.org/#0.0.0.0 www.4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 www\.facebook\.com/#0.0.0.0 www.facebook.com/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 messenger\.com/#0.0.0.0 messenger.com/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 delio\.com.pl/#0.0.0.0 delio.com.pl/' /etc/hosts
+sudo sed -i 's/^0\.0\.0\.0 loverslab\.com/#0.0.0.0 loverslab.com/' /etc/hosts
 
 # Allow LinkedIn and all subdomains (linkedin.com + licdn.com CDN)
 echo "Allowing LinkedIn by commenting out any blocking entries..."
 sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' /etc/hosts
 sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?loverslab\.com)/#\1/' /etc/hosts
 
 # Add custom entries for YouTube and Discord
 echo "Adding custom entries for YouTube and Discord..."
@@ -670,6 +773,11 @@ chattr -i "$CUSTOM_ENTRIES_STATE_FILE" 2>/dev/null || true
 save_custom_entries_state "$current_custom_entries"
 echo "✅ Custom entries state saved to $CUSTOM_ENTRIES_STATE_FILE"
 
+# Save unblock entries state for future protection checks
+current_unblock_entries=$(extract_unblock_entries_from_script "$script_path")
+save_unblock_entries_state "$current_unblock_entries"
+echo "✅ Unblock entries state saved to $UNBLOCK_STATE_FILE"
+
 # Optionally flush DNS caches
 if [[ $FLUSH_DNS -eq 1 ]]; then
 	echo "Flushing DNS caches..."
@@ -773,4 +881,20 @@ if [[ $BROWSERS_KILLED -eq 1 ]]; then
 	echo "   Reopen your browser - hosts blocking is now enforced."
 else
 	echo "   No browsers were running."
+fi
+
+# ============================================================================
+# LOCK THIS SCRIPT AND generate_hosts_file.sh AGAINST SILENT EDITS
+# ============================================================================
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+INSTALL_SCRIPT="$(readlink -f "$0")"
+chattr +i "$INSTALL_SCRIPT" 2>/dev/null \
+	|| echo "⚠ Warning: Could not set immutable attribute on install.sh"
+echo "✓ install.sh locked (chattr +i) — run 'sudo chattr -i $INSTALL_SCRIPT' to unlock for future changes"
+
+GEN_SCRIPT="$SCRIPT_DIR/generate_hosts_file.sh"
+if [[ -f $GEN_SCRIPT ]]; then
+	chattr +i "$GEN_SCRIPT" 2>/dev/null \
+		|| echo "⚠ Warning: Could not set immutable attribute on generate_hosts_file.sh"
+	echo "✓ generate_hosts_file.sh locked (chattr +i)"
 fi
