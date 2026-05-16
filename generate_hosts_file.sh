@@ -86,8 +86,11 @@ sed -i 's/^0\.0\.0\.0 sys\.4chan\.org/#0.0.0.0 sys.4chan.org/' "$TMP"
 sed -i 's/^0\.0\.0\.0 www\.4chan\.org/#0.0.0.0 www.4chan.org/' "$TMP"
 sed -i 's/^0\.0\.0\.0 www\.facebook\.com/#0.0.0.0 www.facebook.com/' "$TMP"
 sed -i 's/^0\.0\.0\.0 messenger\.com/#0.0.0.0 messenger.com/' "$TMP"
+sed -i 's/^0\.0\.0\.0 delio\.com.pl/#0.0.0.0 delio.com.pl/' "$TMP"
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' "$TMP"
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' "$TMP"
+sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?loverslab\.com)/#\1/' "$TMP"
+
 
 # Extract the custom-entries block from install.sh (between the
 # "# Custom blocking entries" comment and the heredoc EOF marker).
