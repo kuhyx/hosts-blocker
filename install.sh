@@ -180,8 +180,12 @@ fi
 # boards.4chan.org
 # sys.4chan.org
 # www.4chan.org
+# facebook.com
 # www.facebook.com
+# m.facebook.com
 # messenger.com
+# fbcdn.net
+# facebook.net
 # delio.com.pl
 # loverslab.com
 # linkedin.com
@@ -408,8 +412,10 @@ sudo sed -i 's/^0\.0\.0\.0 4chan\.org/#0.0.0.0 4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 boards\.4chan\.org/#0.0.0.0 boards.4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 sys\.4chan\.org/#0.0.0.0 sys.4chan.org/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 www\.4chan\.org/#0.0.0.0 www.4chan.org/' /etc/hosts
-sudo sed -i 's/^0\.0\.0\.0 www\.facebook\.com/#0.0.0.0 www.facebook.com/' /etc/hosts
-sudo sed -i 's/^0\.0\.0\.0 messenger\.com/#0.0.0.0 messenger.com/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?facebook\.com)/#\1/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?messenger\.com)/#\1/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?fbcdn\.net)/#\1/' /etc/hosts
+sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?facebook\.net)/#\1/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 delio\.com.pl/#0.0.0.0 delio.com.pl/' /etc/hosts
 sudo sed -i 's/^0\.0\.0\.0 loverslab\.com/#0.0.0.0 loverslab.com/' /etc/hosts
 
