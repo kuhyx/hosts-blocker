@@ -456,8 +456,13 @@ if [[ $ENABLE_RESOLVED -eq 1 ]]; then
 
 	# Ensure ReadEtcHosts=yes in resolved.conf before snapshotting
 	if [[ -f "$RESOLVED_CONF" ]]; then
+		# `|| true` is REQUIRED: grep exits 1 when the key is absent, and under
+		# `set -euo pipefail` that aborts the whole script — silently skipping the
+		# very fix below that exists to handle the absent case. Without it the
+		# "key missing" branch is unreachable. (check_and_enable_services.sh
+		# already guards its copy of this grep the same way.)
 		local_read_hosts=$(grep -E '^\s*ReadEtcHosts\s*=' "$RESOLVED_CONF" 2>/dev/null |
-			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
+			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]') || true
 		if [[ "$local_read_hosts" != "yes" ]]; then
 			msg "Fixing ReadEtcHosts in resolved.conf (was: '$local_read_hosts')"
 			chattr -i "$RESOLVED_CONF" 2>/dev/null || true
@@ -472,8 +477,12 @@ if [[ $ENABLE_RESOLVED -eq 1 ]]; then
 		fi
 
 		# Ensure DNSOverTLS is not set to yes or opportunistic
+		# `|| true`: same trap as above. DNSOverTLS is absent from a default
+		# resolved.conf, so without this the script aborted here on every run —
+		# right before resolved-guard.path was enabled, which is why that guard
+		# was never installed.
 		local_dot=$(grep -E '^\s*DNSOverTLS\s*=' "$RESOLVED_CONF" 2>/dev/null |
-			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
+			tail -1 | sed 's/.*=\s*//' | tr -d '[:space:]') || true
 		if [[ -n "$local_dot" && "$local_dot" != "no" ]]; then
 			msg "Disabling DNSOverTLS in resolved.conf (was: '$local_dot')"
 			chattr -i "$RESOLVED_CONF" 2>/dev/null || true
@@ -514,8 +523,16 @@ if [[ $ENABLE_RESOLVED -eq 1 ]]; then
 		"$INSTALL_ENFORCE_RESOLVED" || warn "resolved enforcement returned non-zero"
 	fi
 
-	# Restart resolved to pick up corrected config
-	run systemctl restart systemd-resolved
+	# Restart resolved to pick up corrected config.
+	# systemd-resolved is not necessarily the resolver: on this host it is MASKED
+	# and dnsmasq serves DNS. Restarting a masked unit fails, and under `set -e`
+	# that aborted the script on its very last step — after everything was already
+	# configured, so the run reported failure despite having succeeded.
+	if systemctl is-enabled systemd-resolved.service &>/dev/null; then
+		run systemctl restart systemd-resolved || warn "Failed to restart systemd-resolved"
+	else
+		note "systemd-resolved is masked/disabled — skipping restart (DNS is served elsewhere, e.g. dnsmasq)"
+	fi
 else
 	note "Skipping resolved.conf protection (--skip-resolved)"
 fi
