@@ -890,17 +890,18 @@ else
 fi
 
 # ============================================================================
-# LOCK THIS SCRIPT AND generate_hosts_file.sh AGAINST SILENT EDITS
+# NOTE: this used to `chattr +i` its own source and generate_hosts_file.sh
+# ("lock against silent edits"). Do NOT reintroduce that: making a git-tracked
+# file immutable breaks git tooling. `pre-commit run --all-files` (which the
+# pre-push ci-mirror gate runs) opens every file rb+ via end-of-file-fixer and
+# dies with "PermissionError: Operation not permitted", so no push from a normal
+# checkout can ever succeed. It also breaks pre-commit's stash of unstaged
+# changes (`git checkout -- .` cannot unlink an immutable file), which silently
+# reverts unrelated unstaged edits.
+#
+# Enforcement does not depend on these sources being immutable: /etc/hosts
+# itself is chattr +i, hosts-guard.path watches and re-enforces it via
+# enforce-hosts.sh against the /usr/local/share/locked-hosts canonical snapshot,
+# and hosts-bind-mount.service pins it. Editing these sources changes nothing
+# until install.sh is re-run as root, which regenerates the guarded artifacts.
 # ============================================================================
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-INSTALL_SCRIPT="$(readlink -f "$0")"
-chattr +i "$INSTALL_SCRIPT" 2>/dev/null \
-	|| echo "⚠ Warning: Could not set immutable attribute on install.sh"
-echo "✓ install.sh locked (chattr +i) — run 'sudo chattr -i $INSTALL_SCRIPT' to unlock for future changes"
-
-GEN_SCRIPT="$SCRIPT_DIR/generate_hosts_file.sh"
-if [[ -f $GEN_SCRIPT ]]; then
-	chattr +i "$GEN_SCRIPT" 2>/dev/null \
-		|| echo "⚠ Warning: Could not set immutable attribute on generate_hosts_file.sh"
-	echo "✓ generate_hosts_file.sh locked (chattr +i)"
-fi
