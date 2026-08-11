@@ -440,6 +440,11 @@ tee -a /etc/hosts >/dev/null <<'EOF'
 0.0.0.0 youtubei.googleapis.com
 0.0.0.0 youtube.googleapis.com
 0.0.0.0 yt3.ggpht.com
+# Channel avatars and banners. Same role as yt3.ggpht.com, which was already
+# here -- Google serves them from both hosts, so blocking one leaves the other
+# resolving. Caught when the phone's DoT resolver was checked domain by domain
+# against the 14 the focus policy names.
+0.0.0.0 yt3.googleusercontent.com
 0.0.0.0 ytimg.com
 0.0.0.0 i.ytimg.com
 0.0.0.0 s.ytimg.com
