@@ -905,8 +905,9 @@ fi
 # reverts unrelated unstaged edits.
 #
 # Enforcement does not depend on these sources being immutable: /etc/hosts
-# itself is chattr +i, hosts-guard.path watches and re-enforces it via
-# enforce-hosts.sh against the /usr/local/share/locked-hosts canonical snapshot,
-# and hosts-bind-mount.service pins it. Editing these sources changes nothing
-# until install.sh is re-run as root, which regenerates the guarded artifacts.
+# itself is chattr +i, guard-lib's "hosts" file-guard instance (guardctl
+# file-guard status hosts) watches and re-enforces it against its canonical
+# snapshot, and the same instance's bind mount pins it. Editing these sources
+# changes nothing until install.sh is re-run as root, which regenerates the
+# guarded artifacts.
 # ============================================================================
