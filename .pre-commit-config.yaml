@@ -1,0 +1,43 @@
+# Standalone config for hosts-blocker, extracted from the testsAndMisc
+# monorepo. The monorepo-specific local hooks (AI evidence/contract gates,
+# python-location, repo-size and directory-depth caps) are deliberately absent:
+# they police monorepo invariants that do not exist here.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      # No --severity filter, matching the monorepo: every finding shellcheck
+      # reports, down to info and style, fails the commit. Settings (including
+      # external-sources and source-path) live in .shellcheckrc.
+      - id: shellcheck
+        name: shellcheck
+        entry: bash -c 'printf "%s\0" "$@" | xargs -0 -n 40 shellcheck' --
+        language: system
+        types: [shell]
+        exclude_types: [zsh]
+
+      # NO shfmt hook, deliberately. The monorepo's git hook shfmt's only
+      # STAGED files, so guard/plugins/*.sh -- untouched since they were
+      # written -- are space-indented and have never been formatted. Their
+      # installed copies at /usr/local/share/guard-lib-plugins/ are
+      # byte-identical to these (verified by md5) and are what the live
+      # resolved/nsswitch guards load. Adding shfmt here would rewrite both
+      # files on the first commit and silently break that identity.
+      # Reformatting them is a separate decision, not part of an extraction.
+
+      # The unit's own suite. Runs on push rather than commit: it spins up
+      # temporary state files and is slower than a formatter.
+      - id: hosts-tests
+        name: hosts lib tests
+        entry: lib/tests/run_all.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

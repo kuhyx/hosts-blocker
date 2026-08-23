@@ -1,0 +1,27 @@
+name: Shell tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shell-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: shellcheck
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find . -name '*.sh' -not -path './.git/*' | sort)
+          printf '%s\0' "${files[@]}" | xargs -0 -n 40 shellcheck
+
+      # The unit's own suite. It writes only to mktemp directories, so it runs
+      # bare on the runner without needing the monorepo's kcov jail.
+      - name: Run lib tests
+        run: ./lib/tests/run_all.sh
