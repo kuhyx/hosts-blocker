@@ -46,7 +46,14 @@ stop_hosts_guard() {
 	# any writes to /etc/hosts. We must stop them before installing, then restart.
 	GUARD_SERVICES_STOPPED=0
 
-	for svc in hosts-bind-mount.service hosts-guard.path; do
+	# Both guard generations must be taken down: the legacy per-file units, and
+	# the guard-lib file-guard instances that lib/hosts_guard_setup.sh registers.
+	# Listing only the legacy names made a SECOND install.sh run fight a live
+	# guard-file@hosts bind mount, so the install was not idempotent once the
+	# guards were actually registered.
+	for svc in hosts-bind-mount.service hosts-guard.path \
+		"guard-file@hosts.path" "guard-file@hosts.service" \
+		"guard-bind-mount@hosts.service"; do
 		if systemctl is-active --quiet "$svc" 2>/dev/null; then
 			echo "Stopping $svc for installation..."
 			systemctl stop "$svc" 2>/dev/null || true
@@ -79,7 +86,15 @@ restart_hosts_guard() {
 			cp /etc/hosts /usr/local/share/locked-hosts
 			echo "  Updated canonical snapshot."
 		fi
-		for svc in hosts-bind-mount.service hosts-guard.path; do
+		# guardctl owns the guard-lib canonical copy; refresh it so the
+		# watcher does not immediately revert the file we just wrote.
+		if [[ -x /usr/local/bin/guardctl ]] && [[ -f /etc/guard-lib/targets/hosts.conf ]]; then
+			/usr/local/bin/guardctl file-guard sync hosts 2>/dev/null ||
+				echo "  (guardctl sync hosts unavailable; canonical copy may lag)"
+		fi
+		for svc in hosts-bind-mount.service hosts-guard.path \
+			"guard-file@hosts.path" "guard-file@hosts.service" \
+			"guard-bind-mount@hosts.service"; do
 			if systemctl is-enabled --quiet "$svc" 2>/dev/null; then
 				systemctl start "$svc" 2>/dev/null || true
 				echo "  Restarted $svc"

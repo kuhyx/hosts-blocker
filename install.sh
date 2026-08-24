@@ -41,6 +41,8 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
 . "$LIB_DIR/hosts_write.sh"
 # shellcheck source=lib/hosts_browser_doh.sh
 . "$LIB_DIR/hosts_browser_doh.sh"
+# shellcheck source=lib/hosts_guard_setup.sh
+. "$LIB_DIR/hosts_guard_setup.sh"
 
 # ============================================================================
 # CUSTOM ENTRIES PROTECTION MECHANISM
@@ -111,6 +113,12 @@ LOCAL_CACHE="/etc/hosts.stevenblack"
 # snapshot, and the same instance's bind mount pins it. Editing these sources
 # changes nothing until install.sh is re-run as root, which regenerates the
 # guarded artifacts.
+#
+# That claim is only true because setup_hosts_guards (lib/hosts_guard_setup.sh)
+# runs below and REGISTERS those instances. It used to be a lie on any machine
+# where a one-shot migration script in the testsAndMisc monorepo had not been
+# run by hand: chattr +i with nothing watching it. Do not remove that call
+# without also deleting this paragraph.
 # ============================================================================
 
 # ============================================================================
@@ -124,6 +132,12 @@ enable_resolved_reads_hosts
 stop_hosts_guard
 refresh_upstream_cache
 write_hosts_file
+# Register the file-guard instances only AFTER the write: the instance
+# snapshots a canonical copy of the target and pins it with a bind mount, so
+# registering earlier would canonicalise the pre-write file. A failure here is
+# loud but non-fatal -- the hosts file is already written and chattr +i'd, and
+# aborting would leave the box less protected than finishing does.
+setup_hosts_guards || echo "WARNING: hosts guard registration failed - see above" >&2
 restart_hosts_guard
 save_protection_state
 disable_browser_doh
