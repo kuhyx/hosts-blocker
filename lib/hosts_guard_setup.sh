@@ -28,7 +28,13 @@ GUARD_SETUP_PLUGIN_INSTALL_DIR="${GUARD_SETUP_PLUGIN_INSTALL_DIR:-/usr/local/sha
 # Self-relative: this lib ships in the same repo as the plugins it installs.
 # Asking extracted_repos.sh where hosts-blocker is would make the extracted
 # repo depend on the monorepo it was extracted from.
-GUARD_SETUP_PLUGIN_SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../guard/plugins" 2>/dev/null && pwd || true)"
+# `if cd` rather than `cd && pwd || true`: the latter reads as if-then-else and
+# is not one (SC2015), which shellcheck fails CI over.
+GUARD_SETUP_PLUGIN_SRC_DIR=""
+if _guard_setup_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/../guard/plugins" 2>/dev/null && pwd)"; then
+	GUARD_SETUP_PLUGIN_SRC_DIR="$_guard_setup_src"
+fi
+unset _guard_setup_src
 
 # name | target | bind_mount | plugin basename | also_watch
 guard_setup_instance_spec() {
