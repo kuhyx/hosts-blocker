@@ -5,6 +5,24 @@
 # never consults /etc/hosts, so leaving it on defeats every entry this script
 # installs. Sourced by install.sh.
 
+# Tracks whether this run actually changed a DoH setting. restart_browsers only
+# kills browsers when it did: install.sh is re-run constantly (every browser
+# launch via browser-preexec-wrapper, hosts-file-monitor, periodic maintenance),
+# and killing every browser on a run that changed nothing is how a session dies
+# mid-form for no reason. Measured on 2026-08-31: 373 identical appends to
+# Firefox's user.js, i.e. 373 unnecessary SIGKILLs of every running browser.
+DOH_POLICY_CHANGED=0
+
+# Write $2 to $1 only if the content differs, flagging a real change.
+write_policy_if_changed() {
+	local path="$1" content="$2"
+	if [[ -f $path ]] && [[ "$(cat "$path")" == "$content" ]]; then
+		return 0
+	fi
+	printf '%s\n' "$content" >"$path"
+	DOH_POLICY_CHANGED=1
+}
+
 # Turn off DNS-over-HTTPS in every installed browser. DoH resolves names
 # over the browser's own encrypted channel, bypassing /etc/hosts completely.
 disable_browser_doh() {
@@ -23,15 +41,22 @@ disable_browser_doh() {
 	if [[ -d "$REAL_HOME/.mozilla/firefox" ]]; then
 		for profile in "$REAL_HOME/.mozilla/firefox"/*.default*; do
 			if [[ -d "$profile" ]]; then
-				cat >>"$profile/user.js" <<'FIREFOXEOF'
+				# Append only when absent. This used to append unconditionally,
+				# which grew user.js to ~100KB of the same five prefs repeated.
+				if grep -q 'doh-rollout.disable-heuristics' "$profile/user.js" 2>/dev/null; then
+					echo "   Firefox DoH already disabled in: $(basename "$profile")"
+				else
+					cat >>"$profile/user.js" <<'FIREFOXEOF'
 // Disable DNS over HTTPS (DoH) to ensure /etc/hosts blocking works
 // Added by linux-configuration hosts installer
 user_pref("network.trr.mode", 5);  // 5 = Off by user choice
 user_pref("doh-rollout.enabled", false);
 user_pref("doh-rollout.disable-heuristics", true);
 FIREFOXEOF
-				chown "$REAL_USER:$REAL_USER" "$profile/user.js"
-				echo "   Firefox DoH disabled in: $(basename "$profile")"
+					chown "$REAL_USER:$REAL_USER" "$profile/user.js"
+					DOH_POLICY_CHANGED=1
+					echo "   Firefox DoH disabled in: $(basename "$profile")"
+				fi
 			fi
 		done
 	else
@@ -42,12 +67,8 @@ FIREFOXEOF
 	CHROME_POLICY_DIR="/etc/chromium/policies/managed"
 	if [[ -d "/etc/chromium" ]] || command -v chromium &>/dev/null; then
 		mkdir -p "$CHROME_POLICY_DIR"
-		cat >"$CHROME_POLICY_DIR/disable-doh.json" <<'CHROMEEOF'
-{
-  "DnsOverHttpsMode": "off",
-  "BuiltInDnsClientEnabled": false
-}
-CHROMEEOF
+		write_policy_if_changed "$CHROME_POLICY_DIR/disable-doh.json" \
+			"$(printf '{\n  "DnsOverHttpsMode": "off",\n  "BuiltInDnsClientEnabled": false\n}')"
 		echo "   Chromium DoH disabled via policy"
 	fi
 
@@ -55,12 +76,8 @@ CHROMEEOF
 	GCHROME_POLICY_DIR="/etc/opt/chrome/policies/managed"
 	if [[ -d "/etc/opt/chrome" ]] || command -v google-chrome &>/dev/null; then
 		mkdir -p "$GCHROME_POLICY_DIR"
-		cat >"$GCHROME_POLICY_DIR/disable-doh.json" <<'GCHROMEEOF'
-{
-  "DnsOverHttpsMode": "off",
-  "BuiltInDnsClientEnabled": false
-}
-GCHROMEEOF
+		write_policy_if_changed "$GCHROME_POLICY_DIR/disable-doh.json" \
+			"$(printf '{\n  "DnsOverHttpsMode": "off",\n  "BuiltInDnsClientEnabled": false\n}')"
 		echo "   Google Chrome DoH disabled via policy"
 	fi
 
@@ -79,6 +96,12 @@ restart_browsers() {
 	# FORCE BROWSER RESTART TO APPLY DOH CHANGES
 	# ============================================================================
 	# Kill all browser processes so DoH changes take effect immediately
+	if [[ ${DOH_POLICY_CHANGED:-0} -ne 1 ]]; then
+		echo ""
+		echo "DoH policy unchanged - leaving running browsers alone."
+		return 0
+	fi
+
 	echo ""
 	echo "Killing browsers to apply DoH policy changes..."
 	BROWSERS_KILLED=0
