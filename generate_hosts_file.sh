@@ -30,6 +30,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_SH="$SCRIPT_DIR/install.sh"
+# The custom blocking entries live in their own data file. They used to be a
+# heredoc inside install.sh, and this script still grepped for that marker long
+# after the extraction -- which silently produced an EMPTY custom section, so the
+# LAN/phone feed blocked nothing custom while /etc/hosts blocked correctly.
+CUSTOM_ENTRIES="$SCRIPT_DIR/custom_entries.hosts"
 URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn-social/hosts"
 # Default cache location: same as install.sh so both reuse the same file.
 CACHE="${HOSTS_CACHE:-/etc/hosts.stevenblack}"
@@ -43,6 +48,11 @@ fi
 
 if [[ ! -f $INSTALL_SH ]]; then
 	echo "ERROR: cannot find install.sh at $INSTALL_SH" >&2
+	exit 1
+fi
+
+if [[ ! -f $CUSTOM_ENTRIES ]]; then
+	echo "ERROR: cannot find custom entries at $CUSTOM_ENTRIES" >&2
 	exit 1
 fi
 
@@ -94,15 +104,24 @@ sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' "$TMP"
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?loverslab\.com)/#\1/' "$TMP"
 
 
-# Extract the custom-entries block from install.sh (between the
-# "# Custom blocking entries" comment and the heredoc EOF marker).
-# This is the same pattern install.sh uses for its protection check,
-# so the two files stay in sync automatically.
+# Append the custom entries from their data file, the same file install.sh
+# appends to /etc/hosts, so the LAN feed and /etc/hosts stay in sync.
 {
 	echo ""
-	sed -n '/^# Custom blocking entries$/,/^EOF$/p' "$INSTALL_SH" |
-		sed '$d' # drop the trailing EOF line
+	cat "$CUSTOM_ENTRIES"
 } >>"$TMP"
+
+# Gate, not a warning: a feed that lost its custom entries looks healthy by line
+# count alone (the upstream list is ~175k lines), which is exactly how the empty
+# feed went unnoticed. Fail closed instead of shipping a blocklist that blocks
+# nothing custom.
+custom_expected=$(grep -cE '^0\.0\.0\.0[[:space:]]' "$CUSTOM_ENTRIES" || true)
+custom_got=$(grep -cE '^0\.0\.0\.0[[:space:]]' "$TMP" || true)
+if ((custom_expected > 0)) && ((custom_got < custom_expected)); then
+	echo "ERROR: custom entries missing from generated feed" >&2
+	echo "       expected at least $custom_expected, found $custom_got" >&2
+	exit 1
+fi
 
 if [[ $OUT == "-" ]]; then
 	cat "$TMP"
