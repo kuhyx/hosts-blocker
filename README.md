@@ -25,7 +25,7 @@ callers cannot find it — they fail loudly with a clone instruction rather than
 silently skipping the blocker.
 
 ```bash
-git clone https://github.com/kuhyx/hosts-blocker ~/hosts-blocker
+git clone https://github.com/kuhyx/hosts-blocker ~/src/hosts-blocker
 ```
 
 ## Layout
