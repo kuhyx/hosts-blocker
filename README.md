@@ -35,9 +35,32 @@ git clone https://github.com/kuhyx/hosts-blocker ~/src/hosts-blocker
 | `install.sh` | Flag parsing, protection gates, and the phase order |
 | `generate_hosts_file.sh` | Builds a hosts file from a feed for the DNS blocker |
 | `custom_entries.hosts` | Hand-maintained additional blocked domains |
-| `lib/` | One file per install phase (cache, write, guard, DoH, protection) |
+| `lib/` | One file per install phase (cache, write, guard, DoH, URL filter, protection) |
 | `lib/tests/` | The unit's test suite — `lib/tests/run_all.sh` |
 | `guard/plugins/` | guard-lib plugins for `resolved.conf` and `nsswitch.conf` |
+
+## The URL-level layer: facebook.com blocked, Messenger allowed
+
+`lib/hosts_browser_urlfilter.sh` (added 2026-09-18). `/etc/hosts` cannot say
+"block the feed, keep the chat": `facebook.com` and `messenger.com` are both in
+the protected unblock list because Messenger's login, 2FA checkpoint and the
+`l.facebook.com` link shim live on facebook.com, and hosts has no notion of a
+path. Managed browser policy has, so that rule is written there instead:
+
+- Chromium family: one new file per managed dir,
+  `facebook-except-messenger.json` (`URLBlocklist` + `URLAllowlist`). The dir
+  merges every JSON it holds, so `disable-doh.json` is untouched.
+- Firefox family (Firefox and LibreWolf, both policy locations each): a
+  `WebsiteFilter` **merged with jq** into the existing `policies.json`. That
+  file also carries LeechBlock's force-install and LibreWolf's own defaults,
+  and a whole-file write would delete them.
+
+Neither write sets `DOH_POLICY_CHANGED`, so `restart_browsers` never kills a
+session for it: Chromium re-reads its policy dir on its own, and Firefox picks
+the change up on its next start. A run that changes nothing writes nothing.
+LibreWolf's `distribution/policies.json` is pacman-owned and is replaced on
+upgrade; `install.sh` runs on every browser launch and hourly from the
+maintenance timer, so the merge comes back within the hour.
 
 ## The two protection mechanisms
 

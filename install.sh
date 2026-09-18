@@ -41,6 +41,8 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
 . "$LIB_DIR/hosts_write.sh"
 # shellcheck source=lib/hosts_browser_doh.sh
 . "$LIB_DIR/hosts_browser_doh.sh"
+# shellcheck source=lib/hosts_browser_urlfilter.sh
+. "$LIB_DIR/hosts_browser_urlfilter.sh"
 # shellcheck source=lib/hosts_guard_setup.sh
 . "$LIB_DIR/hosts_guard_setup.sh"
 
@@ -141,4 +143,5 @@ setup_hosts_guards || echo "WARNING: hosts guard registration failed - see above
 restart_hosts_guard
 save_protection_state
 disable_browser_doh
+apply_browser_urlfilter
 restart_browsers
