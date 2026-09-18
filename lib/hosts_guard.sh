@@ -61,10 +61,20 @@ stop_hosts_guard() {
 		fi
 	done
 
-	# If bind mount is still active, unmount it
+	# Unmount EVERY bind mount stacked on /etc/hosts, and refuse to go on
+	# while one remains. The old "umount || remount rw" fallback is how
+	# facebook.com got blocked on 2026-09-18: with a mount still in place,
+	# `cp` wrote the raw upstream list through the rw mount, then every
+	# `sed -i` (a rename over a mountpoint) failed with "Device or resource
+	# busy", and the guard snapshotted the un-unblocked file as canonical.
+	local tries=0
+	while findmnt /etc/hosts >/dev/null 2>&1 && ((tries++ < 10)); do
+		echo "Unmounting bind mount on /etc/hosts (attempt $tries)..."
+		umount /etc/hosts 2>/dev/null || umount -l /etc/hosts 2>/dev/null || sleep 0.2
+	done
 	if findmnt /etc/hosts >/dev/null 2>&1; then
-		echo "Unmounting read-only bind mount on /etc/hosts..."
-		umount /etc/hosts 2>/dev/null || mount -o remount,rw,bind /etc/hosts 2>/dev/null || true
+		echo "ERROR: /etc/hosts is still a mountpoint after $tries unmount attempts; refusing to write" >&2
+		return 1
 	fi
 
 	# Remove all attributes from /etc/hosts to allow modifications

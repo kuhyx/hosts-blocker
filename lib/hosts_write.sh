@@ -15,6 +15,26 @@
 # The custom blocking entries, as data beside this lib rather than inline.
 CUSTOM_ENTRIES_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/custom_entries.hosts"
 
+# The domains the seds above must have commented out. A live entry for any
+# of them means the unblock silently failed (2026-09-18: every sed lost to a
+# still-mounted /etc/hosts) -- fail the run rather than snapshot that file.
+UNBLOCK_VERIFY_DOMAINS=(facebook.com messenger.com fbcdn.net facebook.net linkedin.com licdn.com)
+
+verify_unblocks() {
+	local domain live=0
+	for domain in "${UNBLOCK_VERIFY_DOMAINS[@]}"; do
+		if grep -qE "^0\.0\.0\.0[[:space:]]+([a-zA-Z0-9._-]+\.)?${domain//./\\.}$" /etc/hosts; then
+			echo "ERROR: $domain is still blocked in /etc/hosts after the unblock pass" >&2
+			live=1
+		fi
+	done
+	if ((live)); then
+		echo "ERROR: unblock pass did not take (is /etc/hosts still a mountpoint?)" >&2
+		return 1
+	fi
+	echo "Unblock pass verified: ${#UNBLOCK_VERIFY_DOMAINS[@]} domains resolvable."
+}
+
 write_hosts_file() {
 	# Install the base hosts from cache into /etc/hosts
 	echo "Installing base hosts from cache to /etc/hosts..."
@@ -44,6 +64,8 @@ write_hosts_file() {
 	# Add custom entries for YouTube and Discord
 	echo "Adding custom entries for YouTube and Discord..."
 	tee -a /etc/hosts >/dev/null <"$CUSTOM_ENTRIES_FILE"
+
+	verify_unblocks
 
 	# Set proper permissions (readable by all, writable only by root)
 	sudo chmod 644 /etc/hosts

@@ -5,6 +5,21 @@ if [[ $EUID -ne 0 ]]; then
 	exec sudo -E bash "$0" "$@"
 fi
 
+# One run at a time. This script is started by the hourly maintenance timer,
+# by every browser launch (the /usr/local/bin wrappers) AND by
+# hosts-file-monitor, which reacts to /etc/hosts changing -- including the
+# changes this script makes. On 2026-09-18 20:01 two runs interleaved: the
+# second run's `cp` of the raw StevenBlack list landed after the first run's
+# unblock seds, the guard snapshotted that as canonical, and facebook.com --
+# deliberately unblocked -- was silently blocked until someone noticed. A
+# waiting run redoes the same idempotent work once the lock frees.
+HOSTS_BLOCKER_LOCK="${HOSTS_BLOCKER_LOCK:-/run/lock/hosts-blocker.lock}"
+exec 9>"$HOSTS_BLOCKER_LOCK"
+if ! flock -w 300 9; then
+	echo "install.sh: another run held $HOSTS_BLOCKER_LOCK for 5 minutes; giving up" >&2
+	exit 1
+fi
+
 # Options
 # Default: do NOT flush DNS caches unless explicitly requested
 FLUSH_DNS=0
@@ -131,9 +146,20 @@ LOCAL_CACHE="/etc/hosts.stevenblack"
 # cap; the sequence is unchanged, including the guard being taken down before
 # the write and restarted immediately after it.
 enable_resolved_reads_hosts
-stop_hosts_guard
+# Both gates are hard stops: a write while /etc/hosts is still a mountpoint,
+# or one whose unblock seds did not take, must not reach setup_hosts_guards --
+# that is the step which snapshots whatever is on disk as the canonical copy.
+if ! stop_hosts_guard; then
+	echo "install.sh: could not take the hosts guard down; nothing written" >&2
+	restart_hosts_guard
+	exit 1
+fi
 refresh_upstream_cache
-write_hosts_file
+if ! write_hosts_file; then
+	echo "install.sh: /etc/hosts write failed verification; guard restarted, canonical NOT updated" >&2
+	restart_hosts_guard
+	exit 1
+fi
 # Register the file-guard instances only AFTER the write: the instance
 # snapshots a canonical copy of the target and pins it with a bind mount, so
 # registering earlier would canonicalise the pre-write file. A failure here is
