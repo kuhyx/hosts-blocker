@@ -28,7 +28,10 @@ URLFILTER_BLOCKED_HOSTS=(facebook.com)
 # leaving Facebook" interstitial the shim 302s to when a link's signature is
 # missing (measured with curl). Widen from measured traffic, never guesses.
 URLFILTER_ALLOWED_HOSTS=(messenger.com l.facebook.com lm.facebook.com)
-URLFILTER_ALLOWED_PATHS=(login two_step_verification checkpoint x/oauth dialog/oauth flx/warn)
+# common/: helper iframes the auth pages embed (common/referer_frame.php sat
+# inside two_step_verification and, blocked, killed the captcha -- measured
+# via "View frame source" in Chrome, 2026-09-18). Plumbing, not a feed.
+URLFILTER_ALLOWED_PATHS=(login two_step_verification checkpoint x/oauth dialog/oauth flx/warn common)
 
 # Overridable so the tests can point every write at a tmpdir.
 URLFILTER_CHROMIUM_DIRS="${URLFILTER_CHROMIUM_DIRS:-/etc/chromium/policies/managed /etc/opt/chrome/policies/managed}"

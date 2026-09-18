@@ -52,6 +52,7 @@ _t_eq "true" "$(jq '.URLAllowlist | index("l.facebook.com") != null' "$chromium_
 _t_eq "true" "$(jq '.URLAllowlist | index("facebook.com/login") != null' "$chromium_policy")" "facebook.com/login is allowlisted"
 _t_eq "true" "$(jq '.URLAllowlist | index("facebook.com/checkpoint") != null' "$chromium_policy")" "the 2FA checkpoint is allowlisted"
 _t_eq "true" "$(jq '.URLAllowlist | index("facebook.com/two_step_verification") != null' "$chromium_policy")" "the 2FA step messenger.com actually redirects to is allowlisted"
+_t_eq "true" "$(jq '.URLAllowlist | index("facebook.com/common") != null' "$chromium_policy")" "the auth pages' helper iframes (common/referer_frame.php) are allowlisted"
 _t_eq "0" "$(jq '[.URLAllowlist[] | select(. == "facebook.com")] | length' "$chromium_policy")" "the bare feed host is never allowlisted"
 
 printf '\n# Firefox family: merge, do not overwrite\n'
