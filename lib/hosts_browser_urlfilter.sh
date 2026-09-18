@@ -20,13 +20,15 @@
 # the host and every subdomain; the Firefox match pattern below says the same.
 URLFILTER_BLOCKED_HOSTS=(facebook.com)
 
-# Paths on facebook.com that Messenger still needs: its login and 2FA
-# checkpoint, the OAuth dialog, the l./lm. link shim every link a friend
-# sends goes through, and flx/warn -- the "you are leaving Facebook"
-# interstitial the shim 302s to when a link's signature is missing (measured
-# with curl, 2026-09-18). Widen from measured traffic, not from guesses.
+# Paths on facebook.com that Messenger still needs: its login, the 2FA step
+# (messenger.com's login POST 302s to facebook.com/two_step_verification/
+# authentication/ -- measured in Chrome, 2026-09-18; "checkpoint" is the
+# older account-review flow, kept), the OAuth dialog, the l./lm. link shim
+# every link a friend sends goes through, and flx/warn -- the "you are
+# leaving Facebook" interstitial the shim 302s to when a link's signature is
+# missing (measured with curl). Widen from measured traffic, never guesses.
 URLFILTER_ALLOWED_HOSTS=(messenger.com l.facebook.com lm.facebook.com)
-URLFILTER_ALLOWED_PATHS=(login checkpoint x/oauth dialog/oauth flx/warn)
+URLFILTER_ALLOWED_PATHS=(login two_step_verification checkpoint x/oauth dialog/oauth flx/warn)
 
 # Overridable so the tests can point every write at a tmpdir.
 URLFILTER_CHROMIUM_DIRS="${URLFILTER_CHROMIUM_DIRS:-/etc/chromium/policies/managed /etc/opt/chrome/policies/managed}"
