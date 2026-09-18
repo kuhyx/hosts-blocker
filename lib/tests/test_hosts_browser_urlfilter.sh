@@ -62,6 +62,12 @@ _t_eq "true" "$(jq '.policies.WebsiteFilter.Block | index("https://*.facebook.co
 _t_eq "true" "$(jq '.policies.WebsiteFilter.Exceptions | index("https://*.messenger.com/*") != null' "$FF_FILE")" "messenger.com is excepted in Firefox"
 _t_eq "true" "$(jq '.policies.WebsiteFilter.Exceptions | index("https://*.l.facebook.com/*") != null' "$FF_FILE")" "the link shim is excepted in Firefox"
 _t_eq "true" "$(jq '.policies.WebsiteFilter.Exceptions | index("https://*.facebook.com/login*") != null' "$FF_FILE")" "login is excepted in Firefox"
+_t_eq "true" "$(jq '.policies.WebsiteFilter.Block | index("https://facebook.com/*") != null' "$FF_FILE")" "the bare facebook.com host is blocked, not only *.facebook.com"
+_t_eq "true" "$(jq '.policies.WebsiteFilter.Exceptions | index("https://l.facebook.com/*") != null' "$FF_FILE")" "the bare link-shim host is excepted (LibreWolf: *.host misses the bare host)"
+_t_eq "true" "$(jq '.policies.WebsiteFilter.Exceptions | index("https://facebook.com/login*") != null' "$FF_FILE")" "login is excepted on the bare host too"
+chmod 0600 "$LW_FILE"
+apply_browser_urlfilter >/dev/null 2>&1
+_t_eq "644" "$(stat -c %a "$LW_FILE")" "a root-only policies.json is made readable by the browser"
 _t_eq "no" "$(_exists "$MISSING_FILE")" "a policies.json that does not exist is not created"
 
 printf '\n# Idempotence: a second run rewrites nothing\n'

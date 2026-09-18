@@ -21,10 +21,12 @@
 URLFILTER_BLOCKED_HOSTS=(facebook.com)
 
 # Paths on facebook.com that Messenger still needs: its login and 2FA
-# checkpoint, the OAuth dialog, and the l./lm. link shim every link a friend
-# sends goes through. Widen from measured traffic, not from guesses.
+# checkpoint, the OAuth dialog, the l./lm. link shim every link a friend
+# sends goes through, and flx/warn -- the "you are leaving Facebook"
+# interstitial the shim 302s to when a link's signature is missing (measured
+# with curl, 2026-09-18). Widen from measured traffic, not from guesses.
 URLFILTER_ALLOWED_HOSTS=(messenger.com l.facebook.com lm.facebook.com)
-URLFILTER_ALLOWED_PATHS=(login checkpoint x/oauth dialog/oauth)
+URLFILTER_ALLOWED_PATHS=(login checkpoint x/oauth dialog/oauth flx/warn)
 
 # Overridable so the tests can point every write at a tmpdir.
 URLFILTER_CHROMIUM_DIRS="${URLFILTER_CHROMIUM_DIRS:-/etc/chromium/policies/managed /etc/opt/chrome/policies/managed}"
@@ -50,13 +52,16 @@ urlfilter_chromium_policy() {
 }
 
 # Firefox WebsiteFilter: a Block list and an Exceptions list of match patterns.
-# `*.facebook.com` matches the bare host too, so one pattern per scheme covers
-# the whole domain.
+# Every host is emitted in BOTH forms, `host` and `*.host`: measured in
+# LibreWolf on 2026-09-18, `https://*.l.facebook.com/*` in Exceptions did NOT
+# release the bare `l.facebook.com` (every link a friend sends), while the
+# subdomain forms matched as expected. The bare form costs one line and
+# removes the guess.
 urlfilter_firefox_block_json() {
 	local out=() host scheme
 	for host in "${URLFILTER_BLOCKED_HOSTS[@]}"; do
 		for scheme in https http; do
-			out+=("${scheme}://*.${host}/*")
+			out+=("${scheme}://${host}/*" "${scheme}://*.${host}/*")
 		done
 	done
 	jq -n --args '$ARGS.positional' "${out[@]}"
@@ -65,11 +70,11 @@ urlfilter_firefox_block_json() {
 urlfilter_firefox_exceptions_json() {
 	local out=() host path
 	for host in "${URLFILTER_ALLOWED_HOSTS[@]}"; do
-		out+=("https://*.${host}/*")
+		out+=("https://${host}/*" "https://*.${host}/*")
 	done
 	for host in "${URLFILTER_BLOCKED_HOSTS[@]}"; do
 		for path in "${URLFILTER_ALLOWED_PATHS[@]}"; do
-			out+=("https://*.${host}/${path}*")
+			out+=("https://${host}/${path}*" "https://*.${host}/${path}*")
 		done
 	done
 	jq -n --args '$ARGS.positional' "${out[@]}"
@@ -121,6 +126,11 @@ apply_firefox_urlfilter() {
 		if urlfilter_write_if_changed "$file" "$merged"; then
 			echo "   URL filter merged into: $file (takes effect on next start)"
 		fi
+		# The browser runs as the user and needs to READ this. A root-only
+		# policies.json (digital-wellbeing's LeechBlock installer left three
+		# of them at 0600) made LibreWolf report "Enterprise Policies service
+		# is inactive" and ignore every policy, measured 2026-09-18.
+		chmod 0644 "$file"
 	done
 }
 
