@@ -238,6 +238,19 @@
 0.0.0.0 m.ubereats.com
 0.0.0.0 api.ubereats.com
 0.0.0.0 uber.com
+# Added 2026-08-31 while an Uber account deletion is in its 30-day grace
+# window: a single sign-in ANYWHERE restores the account, so every sign-in
+# surface has to be closed, not just the .com ones that were here.
+0.0.0.0 uber.pl
+0.0.0.0 www.uber.pl
+0.0.0.0 m.uber.pl
+0.0.0.0 ubereats.pl
+0.0.0.0 www.ubereats.pl
+0.0.0.0 uber.co.uk
+0.0.0.0 www.uber.co.uk
+0.0.0.0 wallet.uber.com
+0.0.0.0 app.jush.pl
+0.0.0.0 api.jush.pl
 0.0.0.0 www.uber.com
 0.0.0.0 m.uber.com
 0.0.0.0 api.uber.com
