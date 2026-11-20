@@ -158,6 +158,8 @@ reset_state() {
 	# machine that test describes, so they reset too -- otherwise a failure
 	# marker leaks into the next group and it passes for the wrong reason.
 	rm -f "$(dirname "${HOSTS_TEST_CALLS}")"/curl_fails \
+		"$(dirname "${HOSTS_TEST_CALLS}")"/full_fails \
+		"$(dirname "${HOSTS_TEST_CALLS}")"/full_hangs \
 		"$(dirname "${HOSTS_TEST_CALLS}")"/remote_body
 	: >"${HOSTS_TEST_CALLS}"
 	mkdir -p "${FAKE_ROOT}"

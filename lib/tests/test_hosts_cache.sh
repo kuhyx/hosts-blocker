@@ -26,10 +26,26 @@ dev="$(dirname "${HOSTS_TEST_CALLS}")"
 [[ -f "${dev}/curl_fails" ]] && exit 22
 out=""
 prev=""
+ranged=0
+max_time=0
 for a in "$@"; do
 	[[ "$prev" == "-o" ]] && out="$a"
+	[[ "$a" == Range:* ]] && ranged=1
+	[[ "$a" == --max-time ]] && max_time=1
 	prev="$a"
 done
+# The full download is the one call with -o and no Range header. full_fails
+# makes only that call fail; full_hangs makes it stall like a dead server:
+# real curl gives up with exit 28 when it has --max-time, and without one it
+# would wait forever (exec, so timeout(1) kills the sleep itself and no
+# orphan keeps a pipe open).
+if [[ -n "$out" && $ranged -eq 0 ]]; then
+	[[ -f "${dev}/full_fails" ]] && exit 22
+	if [[ -f "${dev}/full_hangs" ]]; then
+		[[ $max_time -eq 1 ]] && exit 28
+		exec sleep 30
+	fi
+fi
 body="${dev}/remote_body"
 [[ -f "$body" ]] || : >"$body"
 if [[ -n "$out" ]]; then
@@ -115,5 +131,56 @@ if download_remote_full_to "${TEST_TMPDIR}/full2"; then
 else
 	_t_pass "a failed download reports failure"
 fi
+
+echo "== download_remote_full_to: a stalled server =="
+reset_state
+: >"${DEV}/full_hangs"
+set +e
+URL="$URL" timeout 10 "${SCRIPT_DIR}/call_lib_fn.sh" "${SCRIPT_DIR}/../hosts_cache.sh" \
+	download_remote_full_to "${TEST_TMPDIR}/full3" >/dev/null 2>&1
+rc=$?
+set -e
+if [[ $rc -ne 124 && $rc -ne 0 ]]; then
+	_t_pass "a stalled download gives up on its own and reports failure (rc $rc)"
+else
+	_t_fail "a stalled download gives up on its own and reports failure (rc $rc; 124 = hung)"
+fi
+_t_has "$(cat "${HOSTS_TEST_CALLS}")" "--connect-timeout 10 --max-time 120" \
+	"the full download carries connect and total timeouts"
+
+# refresh_upstream_cache runs as root inside install.sh. A failed download
+# must leave the cached list in use, and must return (not exit) so the caller
+# decides what happens to the guard. Run in a subshell: it sets an EXIT trap.
+run_refresh() { # sets RC and OUT
+	set +e
+	OUT="$(URL="$URL" LOCAL_CACHE="$LOCAL_CACHE" timeout 10 "${SCRIPT_DIR}/call_lib_fn.sh" \
+		"${SCRIPT_DIR}/../hosts_cache.sh" refresh_upstream_cache 2>&1)"
+	RC=$?
+	set -e
+}
+LOCAL_CACHE="${TEST_TMPDIR}/hosts.stevenblack"
+for mode in full_fails full_hangs; do
+	echo "== refresh_upstream_cache: outdated cache, ${mode} =="
+	reset_state
+	write_dated_file "$LOCAL_CACHE" "01 January 2026 00:00:00"
+	cp "$LOCAL_CACHE" "${TEST_TMPDIR}/cache.before"
+	write_dated_file "${DEV}/remote_body" "05 May 2026 00:00:00"
+	: >"${DEV}/${mode}"
+	run_refresh
+	_t_has "$OUT" "rc=0" "${mode}: falls back to the cached list and returns 0 (got rc ${RC})"
+	if cmp -s "$LOCAL_CACHE" "${TEST_TMPDIR}/cache.before"; then
+		_t_pass "${mode}: the cached list is left byte-identical"
+	else
+		_t_fail "${mode}: the cached list is left byte-identical"
+	fi
+done
+
+echo "== refresh_upstream_cache: no cache, download fails =="
+reset_state
+rm -f "$LOCAL_CACHE"
+write_dated_file "${DEV}/remote_body" "05 May 2026 00:00:00"
+: >"${DEV}/full_fails"
+run_refresh
+_t_has "$OUT" "rc=1" "with nothing cached it returns 1 to the caller instead of exiting"
 
 _t_summary

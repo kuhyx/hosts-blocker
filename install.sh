@@ -5,20 +5,10 @@ if [[ $EUID -ne 0 ]]; then
 	exec sudo -E bash "$0" "$@"
 fi
 
-# One run at a time. This script is started by the hourly maintenance timer,
-# by every browser launch (the /usr/local/bin wrappers) AND by
-# hosts-file-monitor, which reacts to /etc/hosts changing -- including the
-# changes this script makes. On 2026-09-18 20:01 two runs interleaved: the
-# second run's `cp` of the raw StevenBlack list landed after the first run's
-# unblock seds, the guard snapshotted that as canonical, and facebook.com --
-# deliberately unblocked -- was silently blocked until someone noticed. A
-# waiting run redoes the same idempotent work once the lock frees.
-HOSTS_BLOCKER_LOCK="${HOSTS_BLOCKER_LOCK:-/run/lock/hosts-blocker.lock}"
-exec 9>"$HOSTS_BLOCKER_LOCK"
-if ! flock -w 300 9; then
-	echo "install.sh: another run held $HOSTS_BLOCKER_LOCK for 5 minutes; giving up" >&2
-	exit 1
-fi
+# One run at a time; see lib/hosts_lock.sh for why.
+# shellcheck source=lib/hosts_lock.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/hosts_lock.sh"
+acquire_install_lock "$@"
 
 # Options
 # Default: do NOT flush DNS caches unless explicitly requested
@@ -33,8 +23,11 @@ for arg in "$@"; do
 	--no-flush-dns)
 		FLUSH_DNS=0
 		;;
+	--skip-if-busy)
+		# Consumed by acquire_install_lock above; listed so --help shows it.
+		;;
 	-h | --help)
-		echo "Usage: $0 [--flush-dns|--no-flush-dns]"
+		echo "Usage: $0 [--flush-dns|--no-flush-dns] [--skip-if-busy]"
 		exit 0
 		;;
 	esac
@@ -142,9 +135,18 @@ LOCAL_CACHE="/etc/hosts.stevenblack"
 # ============================================================================
 # The phases above are defined in the order they run, and run here in that same
 # order. Split out of a single top-level block so the file fits the 250-line
-# cap; the sequence is unchanged, including the guard being taken down before
+# cap; the sequence is unchanged (except the cache refresh, which now runs
+# before the guard comes down), including the guard being taken down before
 # the write and restarted immediately after it.
 enable_resolved_reads_hosts
+# Refresh the cache BEFORE taking the guard down: it is network-bound (up to
+# ~2 min on a stalled server) and touches only the cache file, so it has no
+# business running while /etc/hosts is unprotected. With no usable list at all
+# it fails, and nothing has been touched yet.
+if ! refresh_upstream_cache; then
+	echo "install.sh: no StevenBlack list available; /etc/hosts left as is" >&2
+	exit 1
+fi
 # Both gates are hard stops: a write while /etc/hosts is still a mountpoint,
 # or one whose unblock seds did not take, must not reach setup_hosts_guards --
 # that is the step which snapshots whatever is on disk as the canonical copy.
@@ -153,7 +155,6 @@ if ! stop_hosts_guard; then
 	restart_hosts_guard
 	exit 1
 fi
-refresh_upstream_cache
 if ! write_hosts_file; then
 	echo "install.sh: /etc/hosts write failed verification; guard restarted, canonical NOT updated" >&2
 	restart_hosts_guard

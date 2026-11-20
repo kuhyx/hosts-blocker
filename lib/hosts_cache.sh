@@ -33,11 +33,15 @@ fetch_remote_header() {
 
 download_remote_full_to() {
 	local out="$1"
-	curl -LfsS "$URL" -o "$out"
+	# Without a bound, a stalled server held install.sh -- and with it every
+	# browser launch waiting on its lock -- forever.
+	curl -LfsS --connect-timeout 10 --max-time 120 "$URL" -o "$out"
 }
 
 # Decide whether the cached upstream blocklist is current, and re-download
 # it if not. The cache holds the RAW upstream file, without our additions.
+# Returns 1 only when there is no usable list at all; a failed download with a
+# cache present keeps using the cache (fail-open on freshness, never on blocks).
 refresh_upstream_cache() {
 	# Decide whether to use cache or update
 	TMP_REMOTE_HEAD=$(mktemp)
@@ -69,7 +73,7 @@ refresh_upstream_cache() {
 			echo "No internet; using cached StevenBlack hosts."
 		else
 			echo "Error: No internet and no cached StevenBlack hosts found." >&2
-			exit 1
+			return 1
 		fi
 	fi
 
@@ -83,8 +87,12 @@ refresh_upstream_cache() {
 			echo "Saved latest StevenBlack hosts to cache: $LOCAL_CACHE"
 		else
 			rm -f "$TMP_DL"
-			echo "Error: Failed to download latest StevenBlack hosts." >&2
-			exit 1
+			if [[ -f $LOCAL_CACHE ]]; then
+				echo "Warning: failed to download latest StevenBlack hosts; using cached copy." >&2
+			else
+				echo "Error: Failed to download StevenBlack hosts and none is cached." >&2
+				return 1
+			fi
 		fi
 	fi
 
