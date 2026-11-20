@@ -83,7 +83,7 @@ fi
 
 # ---- Build output ----
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+trap 'rm -f "$TMP" "$TMP.v6"' EXIT
 
 cp "$CACHE" "$TMP"
 
@@ -121,6 +121,13 @@ if ((custom_expected > 0)) && ((custom_got < custom_expected)); then
 	echo "       expected at least $custom_expected, found $custom_got" >&2
 	exit 1
 fi
+
+# Same IPv6 pairing as /etc/hosts (lib/hosts_write.sh), so an AAAA lookup for
+# an upstream-only block cannot fall through to DNS on the LAN feed either.
+# shellcheck source=lib/hosts_write.sh
+. "$SCRIPT_DIR/lib/hosts_write.sh"
+pair_ipv6_blocks "$TMP" >"$TMP.v6"
+mv -f "$TMP.v6" "$TMP"
 
 if [[ $OUT == "-" ]]; then
 	cat "$TMP"

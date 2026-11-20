@@ -61,8 +61,16 @@ health_check() {
 		comm -23 - <(awk '$1 == "0.0.0.0" {print $2}' "$HOSTS_FILE" | sort -u))"
 	[[ -z "$missing" ]] || fail "custom entries missing from $HOSTS_FILE: $(head -5 <<<"$missing" | tr '\n' ' ')"
 
+	# An IPv4-only block lets AAAA lookups fall through to DNS: every
+	# 0.0.0.0 domain needs its :: twin (lib/hosts_ipv6_pairs.awk).
+	local v6_missing
+	v6_missing="$(awk '$1 == "0.0.0.0" && $2 != "0.0.0.0" {print $2}' "$HOSTS_FILE" | sort -u |
+		comm -23 - <(awk '$1 == "::" {print $2}' "$HOSTS_FILE" | sort -u))"
+	[[ -z "$v6_missing" ]] ||
+		fail "$(wc -l <<<"$v6_missing") blocks lack a :: IPv6 twin in $HOSTS_FILE: $(head -3 <<<"$v6_missing" | tr '\n' ' ')"
+
 	verify_unblocks "$HOSTS_FILE" >/dev/null || fail "unblocked domains are blocked in $HOSTS_FILE"
-	log "healthy: ${entries} blocked entries, all custom entries live"
+	log "healthy: ${entries} blocked entries, each with a :: twin, all custom entries live"
 }
 
 main() {

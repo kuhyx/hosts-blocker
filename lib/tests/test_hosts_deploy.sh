@@ -44,7 +44,7 @@ dev="$(dirname "${HOSTS_FILE}")"
 	echo '# Title: StevenBlack/hosts'
 	for i in $(seq 1 "${FILLER:-20}"); do echo "0.0.0.0 filler${i}.example"; done
 	[[ -f "${dev}/drop_custom" ]] || grep '^0\.0\.0\.0' "${HOSTS_BLOCKER_LIVE_DIR}/custom_entries.hosts"
-} >"${HOSTS_FILE}"
+} | if [[ -f "${dev}/drop_v6" ]]; then cat; else awk '{print} $1 == "0.0.0.0" {print ":: " $2}'; fi >"${HOSTS_FILE}"
 echo ran >>"${dev}/install_calls"
 INSTALL
 chmod +x "${FAKE_BIN}/fake_install"
@@ -59,7 +59,7 @@ run_deploy() {
 
 reset_state() {
 	rm -f "${TEST_TMPDIR}/hosts" "${TEST_TMPDIR}/install_fails" \
-		"${TEST_TMPDIR}/drop_custom" "${TEST_TMPDIR}/install_calls"
+		"${TEST_TMPDIR}/drop_custom" "${TEST_TMPDIR}/drop_v6" "${TEST_TMPDIR}/install_calls"
 	make_repos
 }
 
@@ -83,6 +83,12 @@ reset_state
 touch "${TEST_TMPDIR}/drop_custom"
 if run_deploy; then _t_fail "missing custom entry exits non-zero"; else _t_pass "missing custom entry exits non-zero"; fi
 _t_has "$(cat "${TEST_TMPDIR}/out")" "blocked-one.example" "failure names the missing domain"
+
+echo "deploy: a block with no :: twin fails the health check (IPv6 leak)"
+reset_state
+touch "${TEST_TMPDIR}/drop_v6"
+if run_deploy; then _t_fail "IPv4-only hosts file exits non-zero"; else _t_pass "IPv4-only hosts file exits non-zero"; fi
+_t_has "$(cat "${TEST_TMPDIR}/out")" "IPv6" "failure names the IPv6 gap"
 
 echo "deploy: a hosts file below the entry floor fails the health check"
 reset_state

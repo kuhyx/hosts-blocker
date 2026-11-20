@@ -14,6 +14,15 @@
 # unit; splitting its interior would change the file this writes.
 # The custom blocking entries, as data beside this lib rather than inline.
 CUSTOM_ENTRIES_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/custom_entries.hosts"
+IPV6_PAIRS_AWK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hosts_ipv6_pairs.awk"
+
+# Print FILE with a ":: domain" line after every live "0.0.0.0 domain" block
+# that lacks one. Without it an AAAA lookup for an upstream-only block falls
+# through to DNS and the site loads over IPv6. Shared with
+# generate_hosts_file.sh so the LAN feed and /etc/hosts cannot drift.
+pair_ipv6_blocks() {
+	awk -f "$IPV6_PAIRS_AWK" "$1" "$1"
+}
 
 # The domains the seds above must have commented out. A live entry for any
 # of them means the unblock silently failed (2026-09-18: every sed lost to a
@@ -23,7 +32,7 @@ UNBLOCK_VERIFY_DOMAINS=(facebook.com messenger.com fbcdn.net facebook.net fbsbx.
 verify_unblocks() {
 	local file="${1:-/etc/hosts}" domain live=0
 	for domain in "${UNBLOCK_VERIFY_DOMAINS[@]}"; do
-		if grep -qE "^0\.0\.0\.0[[:space:]]+([a-zA-Z0-9._-]+\.)?${domain//./\\.}$" "$file"; then
+		if grep -qE "^(0\.0\.0\.0|::)[[:space:]]+([a-zA-Z0-9._-]+\.)?${domain//./\\.}$" "$file"; then
 			echo "ERROR: $domain is still blocked in $file after the unblock pass" >&2
 			live=1
 		fi
@@ -75,6 +84,15 @@ write_hosts_file() {
 	# Add custom entries for YouTube and Discord
 	echo "Adding custom entries for YouTube and Discord..."
 	tee -a "$HOSTS_STAGING" >/dev/null <"$CUSTOM_ENTRIES_FILE"
+
+	# Block every entry over IPv6 too. Fail closed: no pairs, no swap.
+	echo "Adding :: twins for IPv4-only blocks..."
+	if ! pair_ipv6_blocks "$HOSTS_STAGING" | sudo tee "$HOSTS_STAGING.v6" >/dev/null; then
+		echo "ERROR: could not add the IPv6 blocks" >&2
+		sudo rm -f "$HOSTS_STAGING" "$HOSTS_STAGING.v6"
+		return 1
+	fi
+	sudo mv -f "$HOSTS_STAGING.v6" "$HOSTS_STAGING"
 
 	verify_unblocks "$HOSTS_STAGING" || {
 		sudo rm -f "$HOSTS_STAGING"
