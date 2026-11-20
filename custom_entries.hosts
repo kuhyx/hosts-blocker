@@ -340,3 +340,16 @@
 0.0.0.0 m.subway.com
 0.0.0.0 subway.pl
 0.0.0.0 www.subway.pl
+
+# LoversLab. Was on the unblock list until 2026-11-20. Listed here, not only
+# in the upstream feed: the feed carries 0.0.0.0 lines only, which leaves the
+# AAAA lookup to DNS (getent returned Cloudflare IPv6), and deploy.sh --check
+# verifies only custom entries.
+0.0.0.0 loverslab.com
+:: loverslab.com
+0.0.0.0 www.loverslab.com
+:: www.loverslab.com
+0.0.0.0 cdn.loverslab.com
+:: cdn.loverslab.com
+0.0.0.0 static.loverslab.com
+:: static.loverslab.com

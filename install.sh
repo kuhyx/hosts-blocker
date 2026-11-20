@@ -100,8 +100,6 @@ fi
 # fbcdn.net
 # facebook.net
 # fbsbx.com
-# delio.com.pl
-# loverslab.com
 # linkedin.com
 # licdn.com
 # PROTECTED_UNBLOCK_LIST_END

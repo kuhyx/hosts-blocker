@@ -66,14 +66,11 @@ write_hosts_file() {
 	# cdn.fbsbx.com Messenger's files. Blocked, Messenger login dies inside
 	# the 2FA frame with a plain network error (measured 2026-09-18).
 	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?fbsbx\.com)/#\1/' "$HOSTS_STAGING"
-	sudo sed -i 's/^0\.0\.0\.0 delio\.com.pl/#0.0.0.0 delio.com.pl/' "$HOSTS_STAGING"
-	sudo sed -i 's/^0\.0\.0\.0 loverslab\.com/#0.0.0.0 loverslab.com/' "$HOSTS_STAGING"
 
 	# Allow LinkedIn and all subdomains (linkedin.com + licdn.com CDN)
 	echo "Allowing LinkedIn by commenting out any blocking entries..."
 	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' "$HOSTS_STAGING"
 	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' "$HOSTS_STAGING"
-	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?loverslab\.com)/#\1/' "$HOSTS_STAGING"
 
 	# Add custom entries for YouTube and Discord
 	echo "Adding custom entries for YouTube and Discord..."
