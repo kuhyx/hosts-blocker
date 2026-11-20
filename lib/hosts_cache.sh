@@ -24,8 +24,23 @@ fetch_remote_header() {
 	if curl -LfsS --max-time 10 -H 'Range: bytes=0-4095' "$URL" -o "$out"; then
 		return 0
 	fi
-	# Fallback – may download more, but we only keep first lines
+	# Fallback – may download more, but we only keep first lines. Callers (the
+	# timers, install.sh) run without pipefail, so judge curl by its own status
+	# rather than head's: a dead network must read as "offline", not as an
+	# empty header that looks outdated and triggers a doomed full download.
+	local statuses curl_rc
+	# Read PIPESTATUS as the first command of either branch: the if keeps a
+	# failing pipeline from tripping a caller's errexit, and a later command
+	# would overwrite it.
 	if curl -LfsS --max-time 10 "$URL" | head -n 20 >"$out"; then
+		statuses=("${PIPESTATUS[@]}")
+	else
+		statuses=("${PIPESTATUS[@]}")
+	fi
+	curl_rc=${statuses[0]}
+	# head exits after 20 lines and closes the pipe: curl then ends with 23
+	# (write error) or 141 (SIGPIPE) although the header it delivered is good.
+	if [[ $curl_rc -eq 0 || (($curl_rc == 23 || $curl_rc == 141) && -s $out) ]]; then
 		return 0
 	fi
 	return 1

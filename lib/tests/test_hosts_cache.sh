@@ -39,6 +39,14 @@ done
 # real curl gives up with exit 28 when it has --max-time, and without one it
 # would wait forever (exec, so timeout(1) kills the sleep itself and no
 # orphan keeps a pipe open).
+# range_fails: servers that ignore Range; the piped fallback is then used.
+[[ $ranged -eq 1 && -f "${dev}/range_fails" ]] && exit 22
+# pipe_exit23: after a good body on stdout, curl dies with 23 (write error)
+# because head closed the pipe early; the header it delivered is still good.
+if [[ -z "$out" && -f "${dev}/pipe_exit23" ]]; then
+	cat "${dev}/remote_body"
+	exit 23
+fi
 if [[ -n "$out" && $ranged -eq 0 ]]; then
 	[[ -f "${dev}/full_fails" ]] && exit 22
 	if [[ -f "${dev}/full_hangs" ]]; then
@@ -113,6 +121,27 @@ else
 	_t_pass "a total fetch failure reports failure"
 fi
 
+echo "== fetch_remote_header: curl fails, caller without pipefail =="
+# install.sh and the timers do not set pipefail; the test shell does, which
+# hid that "curl | head" reports head's success. call_lib_fn.sh is a fresh
+# process without pipefail, like production.
+reset_state
+: >"${DEV}/curl_fails"
+rc_line="$(URL="$URL" timeout 10 "${SCRIPT_DIR}/call_lib_fn.sh" "${SCRIPT_DIR}/../hosts_cache.sh" \
+	fetch_remote_header "${TEST_TMPDIR}/header3" 2>&1 || true)"
+_t_has "$rc_line" "rc=1" "a failing curl fails the header fetch even without pipefail"
+
+echo "== fetch_remote_header: curl exit 23 after a good header =="
+reset_state
+write_dated_file "${DEV}/remote_body" "02 February 2026 00:00:00"
+: >"${DEV}/range_fails"
+: >"${DEV}/pipe_exit23"
+rc_line="$(URL="$URL" timeout 10 "${SCRIPT_DIR}/call_lib_fn.sh" "${SCRIPT_DIR}/../hosts_cache.sh" \
+	fetch_remote_header "${TEST_TMPDIR}/header4" 2>&1 || true)"
+_t_has "$rc_line" "rc=0" "head closing the pipe on a good fetch still counts as success"
+_t_eq "1769990400" "$(extract_date_epoch_from_file "${TEST_TMPDIR}/header4")" \
+	"the header kept after the early close is readable"
+
 echo "== download_remote_full_to =="
 reset_state
 write_dated_file "${DEV}/remote_body" "03 March 2026 00:00:00"
@@ -174,6 +203,24 @@ for mode in full_fails full_hangs; do
 		_t_fail "${mode}: the cached list is left byte-identical"
 	fi
 done
+
+echo "== refresh_upstream_cache: offline, outdated cache =="
+reset_state
+write_dated_file "$LOCAL_CACHE" "01 January 2026 00:00:00"
+cp "$LOCAL_CACHE" "${TEST_TMPDIR}/cache.before"
+: >"${DEV}/curl_fails"
+run_refresh
+_t_has "$OUT" "rc=0" "offline: keeps the cached list and returns 0 (got rc ${RC})"
+if grep -q -- '--max-time 120' "${HOSTS_TEST_CALLS}"; then
+	_t_fail "offline: no full download is attempted"
+else
+	_t_pass "offline: no full download is attempted"
+fi
+if cmp -s "$LOCAL_CACHE" "${TEST_TMPDIR}/cache.before"; then
+	_t_pass "offline: the cached list is left byte-identical"
+else
+	_t_fail "offline: the cached list is left byte-identical"
+fi
 
 echo "== refresh_upstream_cache: no cache, download fails =="
 reset_state
