@@ -11,7 +11,14 @@ Extracted from the `testsAndMisc` monorepo with full history.
 ```bash
 sudo ./install.sh              # default: do not flush DNS caches
 sudo ./install.sh --flush-dns  # flush caches after writing
+sudo ./install.sh --cached-only --skip-if-busy  # browser launch: no network, short lock wait
 ```
+
+`--cached-only` builds `/etc/hosts` from the cached upstream list
+(`/etc/hosts.stevenblack`) and makes no network call; with no cache it exits 1
+and leaves `/etc/hosts` alone. The browser-preexec wrapper passes it so a
+stalled network cannot delay a browser start. The hourly maintenance timer and
+hosts-file-monitor run without it and keep the cache fresh.
 
 `install.sh` re-execs itself under `sudo` if needed and resolves its own
 `lib/` directory, so it runs correctly from any checkout location.

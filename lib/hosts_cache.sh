@@ -42,7 +42,23 @@ download_remote_full_to() {
 # it if not. The cache holds the RAW upstream file, without our additions.
 # Returns 1 only when there is no usable list at all; a failed download with a
 # cache present keeps using the cache (fail-open on freshness, never on blocks).
+#
+# CACHED_ONLY=1 (install.sh --cached-only, passed by the browser-preexec
+# wrapper) skips the network entirely: a browser launch must not wait up to
+# ~2 min on a stalled download. The hourly timer keeps the cache fresh. No
+# non-empty cache means no list, so it fails and /etc/hosts stays as it is.
 refresh_upstream_cache() {
+	if [[ ${CACHED_ONLY:-0} -eq 1 ]]; then
+		if [[ -s $LOCAL_CACHE ]]; then
+			echo "Using cached StevenBlack hosts (--cached-only, no network)."
+			return 0
+		fi
+		# The wrapper discards stderr, so the journal is where this shows up.
+		logger -t hosts-blocker "install.sh --cached-only: no cached list at $LOCAL_CACHE; /etc/hosts left as is" || true
+		echo "Error: --cached-only and no cached StevenBlack hosts at $LOCAL_CACHE." >&2
+		return 1
+	fi
+
 	# Decide whether to use cache or update
 	TMP_REMOTE_HEAD=$(mktemp)
 	trap 'rm -f "$TMP_REMOTE_HEAD"' EXIT

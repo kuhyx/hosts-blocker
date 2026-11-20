@@ -13,6 +13,10 @@ acquire_install_lock "$@"
 # Options
 # Default: do NOT flush DNS caches unless explicitly requested
 FLUSH_DNS=0
+# --cached-only: build from the cached upstream list, no network at all (see
+# refresh_upstream_cache). Set here, not inherited: the sudo -E re-exec above
+# keeps the caller's environment, and only the flag may turn it on.
+CACHED_ONLY=0
 
 # Parse CLI flags
 for arg in "$@"; do
@@ -26,8 +30,11 @@ for arg in "$@"; do
 	--skip-if-busy)
 		# Consumed by acquire_install_lock above; listed so --help shows it.
 		;;
+	--cached-only)
+		CACHED_ONLY=1
+		;;
 	-h | --help)
-		echo "Usage: $0 [--flush-dns|--no-flush-dns] [--skip-if-busy]"
+		echo "Usage: $0 [--flush-dns|--no-flush-dns] [--skip-if-busy] [--cached-only]"
 		exit 0
 		;;
 	esac
