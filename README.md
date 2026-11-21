@@ -69,6 +69,32 @@ LibreWolf's `distribution/policies.json` is pacman-owned and is replaced on
 upgrade; `install.sh` runs on every browser launch and hourly from the
 maintenance timer, so the merge comes back within the hour.
 
+### The in-page gap and fb-spa-guard
+
+`URLBlocklist` and `WebsiteFilter` judge document loads only. facebook.com is
+a single-page app: from any page the policy lets through (the 2FA step that
+messenger.com hands you to, now `facebook.com/messages`), its router reaches
+`/reel/...`, `/watch` or the feed with `history.pushState`, and no policy sees
+that. Found 2026-11-21: Helium's history showed hundreds of reels, all chained
+to one messenger.com visit, while a direct load of the same URL was blocked.
+
+`fb-spa-guard/` is a small extension that watches in-page route changes and
+sends the tab to `facebook.com/messages/` when the path is not on the allowed
+list. `lib/hosts_browser_urlguard.sh` packs it (`lib/crx3_pack.py`, signed with
+a root-only key in `/var/lib/hosts-blocker/`) into `/usr/share/hosts-blocker/`,
+only when its source or the allowed-path list changed. The list is generated
+from `URLFILTER_ALLOWED_PATHS`, so guard and policy cannot drift. Delivery:
+Chromium `ExtensionInstallForcelist` (Helium, Chrome); the unpacked guard
+appended to the one `--load-extension` list in `~/.config/chromium-flags.conf`
+(ungoogled-chromium ignores forced installs); Firefox-family `ExtensionSettings`
+plus a locked `xpinstall.signatures.required=false` policy pref (LibreWolf
+rejects the unsigned XPI otherwise, measured 2026-11-21). Private windows are
+disabled (`IncognitoModeAvailability=1`, `DisablePrivateBrowsing`), because
+extensions do not run in them.
+
+Live check, one browser per call: `python3 scripts/fb_probe.py <chromium-binary>`,
+`python3 scripts/fb_probe_firefox.py <binary> direct|routes`.
+
 ## The two protection mechanisms
 
 Both exist to make weakening the blocker require deliberate effort rather than

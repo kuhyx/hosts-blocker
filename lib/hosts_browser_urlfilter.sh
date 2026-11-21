@@ -16,6 +16,9 @@
 #      policies.json carries LeechBlock's force-install and LibreWolf's own
 #      defaults, and a whole-file write would silently delete them.
 
+# shellcheck source=hosts_browser_urlguard.sh
+. "$(dirname "${BASH_SOURCE[0]}")/hosts_browser_urlguard.sh"
+
 # Hosts blocked outright. A bare host in a Chromium URLBlocklist entry matches
 # the host and every subdomain; the Firefox match pattern below says the same.
 URLFILTER_BLOCKED_HOSTS=(facebook.com)
@@ -31,7 +34,14 @@ URLFILTER_ALLOWED_HOSTS=(messenger.com l.facebook.com lm.facebook.com)
 # common/: helper iframes the auth pages embed (common/referer_frame.php sat
 # inside two_step_verification and, blocked, killed the captcha -- measured
 # via "View frame source" in Chrome, 2026-09-18). Plumbing, not a feed.
-URLFILTER_ALLOWED_PATHS=(login two_step_verification checkpoint x/oauth dialog/oauth flx/warn common)
+# login.php: where a logged-out /messages bounces (measured in LibreWolf
+# 2026-11-21); without it the guard and Facebook redirect each other forever.
+# messages, messenger_media: Messenger itself now lives at facebook.com/messages
+# (messenger.com's 2FA hands over to /messages/t/<id>, and attachments open at
+# /messenger_media), measured in Helium's history 2026-11-21. Without them a
+# reload of the chat was blocked. fb-spa-guard keeps the same list for in-page
+# moves (hosts_browser_urlguard.sh).
+URLFILTER_ALLOWED_PATHS=(login login.php two_step_verification checkpoint x/oauth dialog/oauth flx/warn common messages messenger_media)
 
 # Overridable so the tests can point every write at a tmpdir.
 URLFILTER_CHROMIUM_DIRS="${URLFILTER_CHROMIUM_DIRS:-/etc/chromium/policies/managed /etc/opt/chrome/policies/managed}"
@@ -53,7 +63,10 @@ urlfilter_chromium_policy() {
 	jq -n \
 		--argjson block "$(jq -n --args '$ARGS.positional' "${URLFILTER_BLOCKED_HOSTS[@]}")" \
 		--argjson allow "$(jq -n --args '$ARGS.positional' "${allowed[@]}")" \
-		'{URLBlocklist: $block, URLAllowlist: $allow}'
+		--arg guard "${URLGUARD_ID:+${URLGUARD_ID};file://${URLGUARD_SHARE_DIR}/update.xml}" \
+		'{URLBlocklist: $block, URLAllowlist: $allow}
+		 + {IncognitoModeAvailability: 1}
+		 + (if $guard == "" then {} else {ExtensionInstallForcelist: [$guard]} end)'
 }
 
 # Firefox WebsiteFilter: a Block list and an Exceptions list of match patterns.
@@ -117,10 +130,20 @@ apply_firefox_urlfilter() {
 	local file merged block exceptions
 	block="$(urlfilter_firefox_block_json)"
 	exceptions="$(urlfilter_firefox_exceptions_json)"
+	local guard_url=""
+	[[ -n $URLGUARD_ID ]] && guard_url="file://${URLGUARD_SHARE_DIR}/guard.xpi"
 	for file in $URLFILTER_FIREFOX_POLICY_FILES; do
 		[[ -f $file ]] || continue
-		if ! merged="$(jq --argjson block "$block" --argjson exc "$exceptions" '
+		if ! merged="$(jq --argjson block "$block" --argjson exc "$exceptions" \
+			--arg gid "$URLGUARD_GECKO_ID" --arg gurl "$guard_url" '
 			.policies |= (. // {}) |
+			.policies.DisablePrivateBrowsing = true |
+			(if $gurl == "" then . else
+				.policies.Preferences["xpinstall.signatures.required"] = {Value: false, Status: "locked"}
+			end) |
+			(if $gurl == "" then . else
+				.policies.ExtensionSettings[$gid] = {installation_mode: "force_installed", install_url: $gurl}
+			end) |
 			.policies.WebsiteFilter |= (. // {}) |
 			.policies.WebsiteFilter.Block |= ((. // []) + $block | unique) |
 			.policies.WebsiteFilter.Exceptions |= ((. // []) + $exc | unique)
@@ -158,6 +181,9 @@ apply_browser_urlfilter() {
 		echo "ERROR: jq unavailable and could not be installed; URL filter not applied" >&2
 		return 1
 	fi
+	# Not fatal: without the guard the policy still blocks direct loads.
+	urlguard_build || true
 	apply_chromium_urlfilter
+	urlguard_merge_flags
 	apply_firefox_urlfilter
 }
