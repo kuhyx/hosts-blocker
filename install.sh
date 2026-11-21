@@ -35,6 +35,7 @@ for arg in "$@"; do
 		;;
 	-h | --help)
 		echo "Usage: $0 [--flush-dns|--no-flush-dns] [--skip-if-busy] [--cached-only]"
+		bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/kuhy-credit.sh"
 		exit 0
 		;;
 	esac
