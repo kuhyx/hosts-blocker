@@ -27,7 +27,7 @@ pair_ipv6_blocks() {
 # The domains the seds above must have commented out. A live entry for any
 # of them means the unblock silently failed (2026-09-18: every sed lost to a
 # still-mounted /etc/hosts) -- fail the run rather than snapshot that file.
-UNBLOCK_VERIFY_DOMAINS=(facebook.com messenger.com fbcdn.net facebook.net fbsbx.com linkedin.com licdn.com)
+UNBLOCK_VERIFY_DOMAINS=(facebook.com messenger.com fbcdn.net facebook.net fbsbx.com linkedin.com licdn.com whatsapp.com whatsapp.net)
 
 verify_unblocks() {
 	local file="${1:-/etc/hosts}" domain live=0
@@ -80,6 +80,11 @@ write_hosts_file() {
 	echo "Allowing LinkedIn by commenting out any blocking entries..."
 	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' "$HOSTS_STAGING"
 	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' "$HOSTS_STAGING"
+
+	# WhatsApp (whatsapp.com + whatsapp.net and their subdomains): unblocked
+	# like Messenger, to reach people (kuhy, 2026-11-23). Anchored on both ends so
+	# lookalike scam domains (downloads-whatsapp.com) stay blocked.
+	sudo sed -i -E 's/^(0\.0\.0\.0[[:space:]]+([a-zA-Z0-9_-]+\.)*whatsapp\.(com|net))$/#\1/' "$HOSTS_STAGING"
 
 	# Add custom entries for YouTube and Discord
 	echo "Adding custom entries for YouTube and Discord..."

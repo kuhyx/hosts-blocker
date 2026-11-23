@@ -26,9 +26,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=../hosts_protect_unblock.sh
 . "${REPO_ROOT}/lib/hosts_protect_unblock.sh"
 
-readonly BLOCKED=(loverslab.com www.loverslab.com cdn.loverslab.com static.loverslab.com delio.com.pl www.delio.com.pl)
+readonly BLOCKED=(loverslab.com www.loverslab.com cdn.loverslab.com static.loverslab.com delio.com.pl www.delio.com.pl
+	# Lookalikes of the whatsapp unblock: scam domains that must stay blocked.
+	www.downloads-whatsapp.com whatsappsupport.net whatsapp.com.evil.example)
 readonly V6_BLOCKED=(loverslab.com www.loverslab.com cdn.loverslab.com static.loverslab.com delio.com.pl)
-readonly STILL_UNBLOCKED=(facebook.com www.facebook.com linkedin.com)
+readonly STILL_UNBLOCKED=(facebook.com www.facebook.com linkedin.com
+	# kuhy unblocked WhatsApp permanently (2026-11-23), like Messenger, to reach people.
+	whatsapp.com web.whatsapp.com dyn.web.whatsapp.com whatsapp.net mmg.whatsapp.net)
 
 printf '#!/usr/bin/env bash\nexit 22\n' >"${FAKE_BIN}/curl"
 chmod +x "${FAKE_BIN}/curl"
@@ -71,5 +75,11 @@ hits="$(printf '%s\n' "${UNBLOCK_VERIFY_DOMAINS[@]}" | grep -E 'loverslab|delio'
 _t_eq "" "$hits" "UNBLOCK_VERIFY_DOMAINS"
 # The facebook unblock is still expected, so the list itself must survive.
 _t_has "${UNBLOCK_VERIFY_DOMAINS[*]}" "facebook.com" "UNBLOCK_VERIFY_DOMAINS keeps facebook.com"
+
+echo "whatsapp is on every unblock path"
+for d in whatsapp.com whatsapp.net; do
+	_t_has "${UNBLOCK_VERIFY_DOMAINS[*]}" "$d" "UNBLOCK_VERIFY_DOMAINS has $d"
+	_t_has "$(extract_unblock_entries_from_script "${REPO_ROOT}/install.sh")" "$d" "install.sh PROTECTED_UNBLOCK_LIST has $d"
+done
 
 _t_summary

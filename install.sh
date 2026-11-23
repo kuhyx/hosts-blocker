@@ -103,6 +103,8 @@ fi
 # fbsbx.com
 # linkedin.com
 # licdn.com
+# whatsapp.com
+# whatsapp.net
 # PROTECTED_UNBLOCK_LIST_END
 
 # Run the unblock protection check

@@ -101,6 +101,10 @@ sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?facebook\.net)/#\1/' "$TM
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?fbsbx\.com)/#\1/' "$TMP"
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?linkedin\.com)/#\1/' "$TMP"
 sed -i -E 's/^(0\.0\.0\.0[[:space:]]+[a-zA-Z0-9._-]*\.?licdn\.com)/#\1/' "$TMP"
+# WhatsApp (whatsapp.com + whatsapp.net and their subdomains): unblocked
+# like Messenger, to reach people (kuhy, 2026-11-23). Anchored on both ends so
+# lookalike scam domains (downloads-whatsapp.com) stay blocked.
+sed -i -E 's/^(0\.0\.0\.0[[:space:]]+([a-zA-Z0-9_-]+\.)*whatsapp\.(com|net))$/#\1/' "$TMP"
 
 
 # Append the custom entries from their data file, the same file install.sh
