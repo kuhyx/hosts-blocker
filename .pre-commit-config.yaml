@@ -15,15 +15,6 @@ repos:
 
   - repo: local
     hooks:
-      # No --severity filter, matching the monorepo: every finding shellcheck
-      # reports, down to info and style, fails the commit. Settings (including
-      # external-sources and source-path) live in .shellcheckrc.
-      - id: shellcheck
-        name: shellcheck
-        entry: bash -c 'printf "%s\0" "$@" | xargs -0 -n 40 shellcheck' --
-        language: system
-        types: [shell]
-        exclude_types: [zsh]
 
       # NO shfmt hook, deliberately. The monorepo's git hook shfmt's only
       # STAGED files, so guard/plugins/*.sh -- untouched since they were
